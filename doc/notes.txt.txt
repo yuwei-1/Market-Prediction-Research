@@ -1,0 +1,47 @@
+- Learning Resources
+- Oxford Algorithmic Trading Programme
+Link: https://www.sbs.ox.ac.uk/programmes/executive-education/online-programmes/oxford-algorithmic-trading-programme
+- Github link: https://github.com/firmai/financial-machine-learning
+- How to become a quant: core topics by Dimitri Bianco
+
+
+- Machine Learning Models:
+	- LSTM
+	- Reinforcement Learning
+		- DQN
+		- OpenAI Gym
+	- Baseline Models
+
+
+
+- Objective functions
+	- Predict the stock price
+	- Predict buy and sell, as a classification task
+
+- Sources of data
+	- Twitter free API does not allow access to tweet data
+	- Website scraper?
+	- Google Trends API?
+	- Raw price data as csv
+	- 
+
+- How to be a quant?
+- Mathematics and Statistics
+	- Regression (OLS, GLM, Logistic)
+	- Time-Series (ARIMA, GARCH, ECM)
+	- Non - parametric Regression (Splines, Kernels, Locally weighted regression)
+	- Data Exploration (Density Estimation, Normality Tests, Monte Carlo, Copulas)
+	- Data Clearning and Reduction (Cluster Analysis and Stats Theory)
+	- Calculus, Linear Algebra
+	- Optimization (Taylor Series, Markov  Processes)
+	- ODEs, PDEs
+	- Stochastic Calculus (Martingales, Brownian Motion, Stochastic Integrals, Stochastic DEs, Ito's Lemma, Feynman-Kac)
+	- Binomial Asset Pricing
+- Computer Science
+- Finance
+	- Equity (Stock Analysis, Diversification, Technical Analysis, Finance Theory)
+	- Fixed Income (Rate Curves, Pricing, Duration, TVM)
+	- Derivatives (Black-Scholes, BDT, Stochastic Volatility Model, Volatility Smiles and Theory)
+	- Portfolio Optimization (CVaR, Efficient Frontier)
+	- Arbitrage Theory and Statistical Arbitrage
+	- Risk Management (VaR, Statistics, Credit Risk, Market Risk, Liquidity)
