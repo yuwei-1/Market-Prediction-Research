@@ -3,6 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from abc import ABC, abstractmethod
 from tqdm import tqdm
+import plotly.graph_objects as go
+import plotly.express as px
 
 class DataReader():
 
@@ -26,7 +28,7 @@ class DataReader():
 
         print(self.df.head(5))
 
-    def visualize_data(self):
+    def visualize_data_distribution(self):
         
         fig, axs = plt.subplots(nrows=self.num_cols, ncols=1, figsize=(10,40))
 
@@ -34,3 +36,13 @@ class DataReader():
             axs[i].hist(self.df[self.col_names[i]])
 
         plt.tight_layout()
+
+    def plot_candlestick(self):
+    
+        fig = go.Figure(data=[go.Candlestick(x=self.df['Date'],
+                open=self.df['Open'],
+                high=self.df['High'],
+                low=self.df['Low'],
+                close=self.df['Close'])])
+
+        fig.show()
