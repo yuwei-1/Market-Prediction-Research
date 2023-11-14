@@ -36,13 +36,3 @@ class DataReader():
             axs[i].hist(self.df[self.col_names[i]])
 
         plt.tight_layout()
-
-    def plot_candlestick(self):
-    
-        fig = go.Figure(data=[go.Candlestick(x=self.df['Date'],
-                open=self.df['Open'],
-                high=self.df['High'],
-                low=self.df['Low'],
-                close=self.df['Close'])])
-
-        fig.show()

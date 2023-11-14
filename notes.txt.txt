@@ -46,3 +46,104 @@ Link: https://www.sbs.ox.ac.uk/programmes/executive-education/online-programmes/
 	- Portfolio Optimization (CVaR, Efficient Frontier)
 	- Arbitrage Theory and Statistical Arbitrage
 	- Risk Management (VaR, Statistics, Credit Risk, Market Risk, Liquidity)
+
+TODOs:
+- Write code to test if your moving averages are computed correctly
+
+
+- Learning
+
+- Udacity Course: ML for Trading Georgia Tech
+- Books:
+- Python for finance
+- What hedge funds really do
+
+- Content:
+- Bollinger Bands, moving average and moving stds
+- Fill missing data using df.fillna() forward fill and backfill instead of interpolation
+- Histogram plots of daily returns
+- Histogram plots of two stocks together
+- Scatter plot of two stocks together
+- Sharpe Ratio: mean/std of (daily return - risk free return)
+- Risk free return estimate: LIBOR, 3month treasury bill, 0%
+- Sharpe Ratio is an annual measure, must be adjusted for frequency per year
+- Optimizer, optimizing for Sharpe ratio
+- ETFs Exchange Traded Funds, Mutual Funds
+- Expense Ratio: portfolio managers receive some fraction of AUM (Assets under management)
+- 2 and twenty commonly hedge fund managers receive 2% expense ratio and 20% of profits
+- Geographic Arbitrage: Hedge funds take advantages of retail traders trading further away geographically, differences in price at different exchanges
+- Interests rates, what is a dollar worth? present value = future value/(1 + interest rate)^years until money received
+- iNTRINSIC: replace interest rate with discount rate. Higher means it is less likely to pay. Sum into infinite future : Future Value/ Discount Rate
+- Book value: Total assets - liabilities (loans) - intangible assets (brand, patents)
+- Market Cap: no. of shares * share price
+- Market Portfolio, US: S&P 500, UK: FTSE, etc. Within these "oceans" there are islands: energy, finance, etc.
+
+CAPM (Capital Assets Pricing Model) equation is as follows (describing the return of a single stock)
+- r_i(t) = b_i*r_m(t) + a_i
+- r_m(t) is the returns of the market
+- a_i is the residual, which expectation = 0
+- CAPM implications: probably just buy and hold index funds that follow market, choose high beta in up markets and low beta in down markets
+- arbitrage pricing theory says break up beta into different "islands" i.e., r_i(t) = b_F*r_F(t) + b_E*r_E(t) + ... + a_i F for finance and E for energy
+- technical analysis better for the short term
+Features:
+- momentum indicator, calculates the returns of the current price to price n days ago
+- Simple Moving Average (SMA) calculates the return of current price to n day moving average price
+- Bollinger Bands current price - SMA/2*stds
+- How adjustment works ("Adj Close")
+- Survivor Bias data. Some stocks "died" during the 2008 crash, so predicting the SPY using current stocks biases the model
+Efficient Markets Hypothesis (EMH)
+- Large number of investors in market for profit
+- New information arrives randomly
+- Prices are adjusted quickly
+- Prices reflect all available information
+Information Sources
+- Price/Volume data
+- Fundamental
+- Exogenous
+- Company insiders
+EMH
+- Weak: can't predict future prices using current prices (no TA)
+- Medium: Prices adjust rapidly to new public info (no FA)
+- Strong: Prices reflect all information public and private (no Insider info)
+Risk:
+- Probability that you lose it all
+- Standard deviation of bets
+- Standard deviation of daily returns
+- 
+Fundamental law of active portfolio management
+- Information Ratio: using CAPM model, IR = mean(alpha)/std(alpha) of alpha component of CAPM (sharpe ratio of excess returns over market)
+- Information Coefficient: Correlation of forecasts to returns
+- Breadth: number of trading opportunities per year
+- IR = IC*sqrt(breadth)
+Mean Variance Optimization
+Efficient Frontier - optimal line, minimal risk for each return.
+Inputs:
+- Expected return
+- Volatility
+- Covariance
+- target return
+Ouputs:
+- Asset weightings that minimize risk
+
+Machine Learning Segment
+- KNN?
+- List of default features for model
+- Roll forward cross validation
+- Ensemble learners
+- Bagging with 1nn learners, different order polynomials
+- Adaboost
+
+- Reinforcement Learning
+- Q-Learning
+- Dyna-Q Learning
+
+- Interview Tammer Kamel
+- Yield curve arbitrage
+- New data sources
+- Look for theoretically sound ideas
+
+
+
+Udemy:
+Quantitative Finance and Algorithmic Trading
+Time Series Analysis in Python
