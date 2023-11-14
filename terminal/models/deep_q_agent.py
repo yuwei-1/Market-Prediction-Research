@@ -1,12 +1,13 @@
 import gymnasium as gym
-import math
 import random
-import matplotlib
 import matplotlib.pyplot as plt
 from collections import namedtuple, deque
 from itertools import count
 
+import torch
+import torch.nn as nn
 import torch.optim as optim
+import torch.nn.functional as F
 from models.feed_forward_network import FeedForward
 from models.reinforcement_learning_agents import Agent
 
@@ -64,7 +65,7 @@ class DQNAgent(Agent):
         for ep in range(episodes):
             state, _ = self.env.reset()
             state = torch.tensor(state).to(self.device)
-            for t in Count():
+            for t in count():
                 # agent chooses an action
                 action = self.get_action(state)
                 # observe new obs from environment
@@ -73,9 +74,9 @@ class DQNAgent(Agent):
                 if terminated:
                     next_state = None
                 else:
-                    next_state = torch.tensor(next_state).to(device)
+                    next_state = torch.tensor(next_state).to(self.device)
                 # save experience to replay memory
-                reward = torch.tensor([reward]).to(device)
+                reward = torch.tensor([reward]).to(self.device)
                 self.retain_experience(state, action, next_state, reward)
                 # change current state
                 state = next_state
@@ -102,7 +103,7 @@ class DQNAgent(Agent):
         self.target_net.load_state_dict(target_net_state_dict)
 
     def perform_hard_target_update(self):
-        if steps_done % self.hard_update_interval == 0 and steps_done > 0:
+        if self.steps_done % self.hard_update_interval == 0 and self.steps_done > 0:
             net_state_dict = self.net.state_dict()
             target_net_state_dict = self.target_net.state_dict()
             for key in net_state_dict.keys():
@@ -134,7 +135,7 @@ class DQNAgent(Agent):
             else:
                 target[non_terminal_mask] = (self.discount * torch.max(self.net(non_terminal_states), dim=1)[0])
         
-        loss = loss_fn(current_estimate, target + rewards)
+        loss = self.loss_fn(current_estimate, target + rewards)
         self.optimizer.zero_grad()
         loss.backward()
 
@@ -175,7 +176,7 @@ class DQNAgent(Agent):
     
     @staticmethod
     def update_guard(update_type):
-        assert isintance(update_type, str), "update type must be string"
+        assert isinstance(update_type, str), "update type must be string"
         update_type = update_type.lower()
         allowed = {'soft', 'hard'}
         assert update_type in allowed, "target updates must be either hard or soft"
