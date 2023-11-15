@@ -1,5 +1,6 @@
 import gymnasium as gym
 import random
+import matplotlib
 import matplotlib.pyplot as plt
 from collections import namedtuple, deque
 from itertools import count
@@ -10,6 +11,9 @@ import torch.optim as optim
 import torch.nn.functional as F
 from models.feed_forward_network import FeedForward
 from models.reinforcement_learning_agents import Agent
+
+from IPython import display
+is_ipython = 'inline' in matplotlib.get_backend()
 
 class DQNAgent(Agent):
 
@@ -29,14 +33,15 @@ class DQNAgent(Agent):
         self.hard_update_interval = hard_update_interval
         self.target_net_update = self.update_guard(target_net_update)
         self.gradient_clipping = gradient_clipping
-        self.device, self.n_obs, self.n_actions = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.env, self.n_obs, self.n_actions = self.init_env(environment)
         self.replay_memory = self.init_agent_memory()
-        self.net = self.init_agents(self.n_obs, self.n_actions, **net_kwargs)
+        self.net = self.init_agent(self.n_obs, self.n_actions, **net_kwargs)
         if self.double_dqn:
-            self.target_net = self.init_agents(self.n_obs, self.n_actions, **net_kwargs)
+            self.target_net = self.init_agent(self.n_obs, self.n_actions, **net_kwargs)
             self.target_net.load_state_dict(self.net.state_dict())
         self.transition = namedtuple('Transition', ('state', 'action', 'next_state', 'reward'))
-        self.env = self.init_env(environment)
+        
         
     def init_env(self, environment):
         try:
@@ -50,15 +55,15 @@ class DQNAgent(Agent):
             raise error
 
     def init_agent(self, input_size, output_size, q_func_approximator=FeedForward, **net_kwargs):
-        return q_func_approximator(input_size, output_size, **net_kwargs)
+        return q_func_approximator(input_size, output_size, **net_kwargs).to(self.device)
 
-    def train(self, episodes=2000, discount=0.99, batch_size=128, train_threshold=500, learning_rate=0.0001, optimizer=optim.Adam, loss=nn.MSELoss()):
+    def train(self, episodes=2000, discount=0.99, batch_size=128, train_threshold=500, learning_rate=0.0001, optimizer=optim.AdamW, loss=nn.MSELoss()):
         
         self.discount = discount
         self.batch_size = batch_size
         self.train_threshold = train_threshold
         self.loss_fn = loss
-        self.optimizer = optimizer(self.net.parameters(), lr=learning_rate)
+        self.optimizer = optimizer(self.net.parameters(), lr=learning_rate, amsgrad=True)
         self.steps_done = 0
         self.episode_durations = []
         
@@ -85,6 +90,7 @@ class DQNAgent(Agent):
                 # terminate the episode under stopping conditions
                 if terminated or truncated:
                     self.episode_durations.append(t+1)
+                    self.plot_durations()
                     break
                 
                 if self.double_dqn:
@@ -94,6 +100,40 @@ class DQNAgent(Agent):
                         self.perform_hard_target_update()
 
                 self.steps_done += 1
+
+    def plot_durations(self, show_result=False):
+        plt.figure(1)
+        durations_t = torch.tensor(self.episode_durations, dtype=torch.float)
+        if show_result:
+            plt.title('Result')
+        else:
+            plt.clf()
+            plt.title('Training...')
+        plt.xlabel('Episode')
+        plt.ylabel('Duration')
+        plt.plot(durations_t.numpy())
+        # Take 100 episode averages and plot them too
+        if len(durations_t) >= 100:
+            means = durations_t.unfold(0, 100, 1).mean(1).view(-1)
+            means = torch.cat((torch.zeros(99), means))
+            plt.plot(means.numpy())
+
+        plt.pause(0.001)  # pause a bit so that plots are updated
+        if is_ipython:
+            if not show_result:
+                display.display(plt.gcf())
+                display.clear_output(wait=True)
+            else:
+                display.display(plt.gcf())
+
+    def test(self):
+        pass
+
+    def save(self):
+        pass
+
+    def load(self):
+        pass
 
     def perform_soft_target_update(self):
         net_state_dict = self.net.state_dict()
@@ -119,7 +159,7 @@ class DQNAgent(Agent):
         batch = self.transition(*self.recall_experience(self.batch_size))
 
         states = torch.stack(batch.state)
-        rewards = torch.stack(batch.reward)
+        rewards = torch.stack(batch.reward).squeeze()
         actions = torch.stack(batch.action)
 
         # y = r for terminal steps, and y = r + gamma*max_a Q_hat(s', a)
@@ -127,7 +167,7 @@ class DQNAgent(Agent):
         non_terminal_states = torch.stack([ns for ns in batch.next_state if ns is not None]).to(self.device)
 
         current_estimate = torch.gather(self.net(states), 1, actions)
-        target = torch.zeros_like(rewards, device=self.device)
+        target = torch.zeros(self.batch_size, device=self.device)
 
         with torch.no_grad():
             if self.double_dqn:
@@ -135,7 +175,8 @@ class DQNAgent(Agent):
             else:
                 target[non_terminal_mask] = (self.discount * torch.max(self.net(non_terminal_states), dim=1)[0])
         
-        loss = self.loss_fn(current_estimate, target + rewards)
+        loss = self.loss_fn(current_estimate.squeeze(), target + rewards)
+        #print(current_estimate.squeeze().shape, (target + rewards).shape)
         self.optimizer.zero_grad()
         loss.backward()
 
@@ -151,7 +192,7 @@ class DQNAgent(Agent):
         def epsilon_greedy(start, end, n_steps, it):
             return max(start - (start - end) * (it / n_steps), end)
 
-        ep_threshold = epsilon_greedy(1.0, .05, 20000, self.steps_done)
+        ep_threshold = epsilon_greedy(1.0, .05, 1000, self.steps_done)
         rand = random.uniform(0,1)
         if rand <= ep_threshold:
             # choose random action

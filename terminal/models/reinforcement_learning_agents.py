@@ -13,7 +13,7 @@
 from abc import abstractmethod, ABC
 import random
 
-class Agent(ABC):
+class Agent:
 
     def __init__(self):
         pass
