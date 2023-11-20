@@ -142,6 +142,7 @@ Machine Learning Segment
 - New data sources
 - Look for theoretically sound ideas
 
+Algorithmic Trading: Machine Learning + Quant Strategies
 
 
 Udemy:
