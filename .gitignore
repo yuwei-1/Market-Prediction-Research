@@ -1,0 +1,10 @@
+# folders to ignore
+/raw_data
+/doc
+
+# text files
+notes.txt
+
+# other
+*.xlsx
+*.vscode
