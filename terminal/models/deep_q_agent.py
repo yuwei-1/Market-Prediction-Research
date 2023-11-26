@@ -12,6 +12,7 @@ import torch.optim as optim
 import torch.nn.functional as F
 from models.feed_forward_network import FeedForward
 from terminal.models.reinforcement_learning_agent import Agent
+from utils.guards import shape_guard
 
 from IPython import display
 is_ipython = 'inline' in matplotlib.get_backend()
@@ -53,18 +54,13 @@ class DQNAgent(Agent):
             self.target_net = self.init_agent(self.n_obs, self.n_actions, **net_kwargs)
             self.target_net.load_state_dict(self.net.state_dict())
         self.transition = namedtuple('Transition', ('state', 'action', 'next_state', 'reward'))
+        self.stats = "training"
         
-        
-    def init_env(self, environment):
-        try:
-            env = gym.make(environment, render_mode="human")
-            n_actions = env.action_space.n
-            n_obs = env.observation_space.shape[0]
-            return env, n_obs, n_actions
-
-        except Exception as error:
-            print("not a valid environment")
-            raise error
+    def init_env(self, environment, render_mode="human"):
+        env = gym.make(environment, render_mode=render_mode)
+        n_actions = env.action_space.n
+        n_obs = env.observation_space.shape[0]
+        return env, n_obs, n_actions
 
     def init_agent(self, input_size, output_size, q_func_approximator=FeedForward, **net_kwargs):
         return q_func_approximator(input_size, output_size, non_linearity=self.activation, **net_kwargs).to(self.device)
@@ -77,7 +73,8 @@ class DQNAgent(Agent):
               train_threshold=500, 
               learning_rate=0.0001,
               optimizer=lambda param, lr: optim.AdamW(param, lr=lr, amsgrad=True), 
-              loss=nn.MSELoss()):
+              loss=nn.MSELoss(),
+              plot=False):
         '''
         Optimizer should be passed in as a lambda function only accepting the model parameters and learning rate
         '''
@@ -118,7 +115,8 @@ class DQNAgent(Agent):
                 # terminate the episode under stopping conditions
                 if terminated or truncated:
                     self.episode_durations.append(t+1)
-                    self.plot_durations()
+                    if plot:
+                        self.plot_durations()
                     break
                 
                 if self.double_dqn:
@@ -128,8 +126,10 @@ class DQNAgent(Agent):
                         self.perform_hard_target_update()
 
                 self.steps_done += 1
+
         self.env.close()
-        self.plot_final(title=title)
+        if plot:
+            self.plot_final(title=title)
 
     def plot_durations(self, show_result=False):
         # TODO: change up code, so not entirely identical
@@ -139,7 +139,7 @@ class DQNAgent(Agent):
             plt.title('Result')
         else:
             plt.clf()
-            plt.title('Training...')
+            plt.title(self.stats)
         plt.xlabel('Episode')
         plt.ylabel('Duration')
         plt.plot(durations_t.numpy())
@@ -214,14 +214,18 @@ class DQNAgent(Agent):
 
         non_terminal_mask = torch.tensor(tuple(map(lambda ns:ns is not None, next_states)), device=self.device, dtype=torch.bool)
         non_terminal_states = torch.stack([ns for ns in next_states if ns is not None]).to(self.device)
+
         current_estimate = torch.gather(self.net(states), 1, actions)
-        target = torch.zeros(self.batch_size, device=self.device)
+        q_estimate = torch.zeros(self.batch_size, device=self.device)
         with torch.no_grad():
             if self.double_dqn:
-                target[non_terminal_mask] = (self.discount * torch.max(self.target_net(non_terminal_states), dim=1)[0])
+                q_estimate[non_terminal_mask] = (self.discount * torch.max(self.target_net(non_terminal_states), dim=1)[0])
             else:
-                target[non_terminal_mask] = (self.discount * torch.max(self.net(non_terminal_states), dim=1)[0])
-        loss = self.loss_fn(current_estimate.squeeze(), target + rewards)
+                q_estimate[non_terminal_mask] = (self.discount * torch.max(self.net(non_terminal_states), dim=1)[0])
+
+        target = q_estimate + rewards
+        shape_guard(current_estimate, target)
+        loss = self.loss_fn(current_estimate, target)
         return loss
 
     def backprop_network(self, loss, clip=False):
@@ -237,7 +241,7 @@ class DQNAgent(Agent):
     def retrieve_batch_info(self):
         batch = self.transition(*zip(*self.recall_experience(self.batch_size)))
         states = torch.stack(batch.state)
-        rewards = torch.stack(batch.reward).squeeze()
+        rewards = torch.stack(batch.reward)
         actions = torch.stack(batch.action)
         next_states = batch.next_state
         return states, actions, next_states, rewards

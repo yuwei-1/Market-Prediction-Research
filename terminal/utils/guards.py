@@ -15,3 +15,6 @@ def non_linearity_guard(activation):
         return nn.GELU()
     elif activation == 'none':
         return nn.Identity()
+    
+def shape_guard(tensor1, tensor2):
+    assert tensor1.shape == tensor2.shape, f"tensor 1 has shape: {tensor1.shape}, whilst tensor 2 has shape: {tensor2.shape}"

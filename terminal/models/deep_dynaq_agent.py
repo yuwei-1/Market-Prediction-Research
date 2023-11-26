@@ -19,18 +19,11 @@ is_ipython = 'inline' in matplotlib.get_backend()
 
 class DynaDQNAgent(DQNAgent):
 
-    def __init__(self, *dqn_args, planning_steps=50, state_hidden_size=32, reward_hidden_size=32, **dqn_kwargs):
+    def __init__(self, *dqn_args, planning_steps=50, **dqn_kwargs):
         super().__init__(*dqn_args, **dqn_kwargs)
         self.planning_steps = planning_steps
         self.dyna = False
-        # self.state_transition_predictor = self.init_agent(self.n_obs+1, 
-        #                                                   self.n_obs,
-        #                                                   hidden_size_1=state_hidden_size, 
-        #                                                   hidden_size_2=state_hidden_size)
-        # self.reward_predictor = self.init_agent(self.n_obs+1, 
-        #                                         1,
-        #                                         hidden_size_1=reward_hidden_size, 
-        #                                         hidden_size_2=reward_hidden_size)
+        self.state_action_mem = set()
         self.wm = NNWorldModel(device=self.device)
 
     def step_action_value_function(self):
@@ -52,6 +45,9 @@ class DynaDQNAgent(DQNAgent):
         self.construct_world_model()
         self.dyna_planning_steps()
 
+        if self.steps_done % 500 == 0:
+            self.stats = self.wm.test(*self.retrieve_all())
+
     def construct_world_model(self):
         self.wm.observe(*self.retrieve_batch_info())
 
@@ -61,24 +57,29 @@ class DynaDQNAgent(DQNAgent):
         self.dyna = True
         for s in range(self.planning_steps):
             loss = self.get_network_loss()
+            for g in optim.param_groups:
+                g['lr'] *= 0.1
             self.backprop_network(loss)
             if self.double_dqn:
                 if self.target_net_update == "soft":
                     self.perform_soft_target_update()
                 elif self.target_net_update == "hard":
                     self.perform_hard_target_update()
+        for g in optim.param_groups:
+            g['lr'] *= 10
         self.dyna = False
 
     def retrieve_batch_info(self):
         if not self.dyna:
             return super().retrieve_batch_info()
         else:
-            states, actions, _, rewards = super().retrieve_batch_info()
-            features = torch.concat([states, actions], dim=-1)
-            #next_state_pred = self.state_transition_predictor(features)
-            #rewards = self.reward_predictor(features).squeeze()
-            next_state_pred, _ = self.wm.predict(states, actions)
-            return states, actions, next_state_pred, rewards
+            #states, actions, _, _ = super().retrieve_batch_info()
+            states, actions = zip(*random.sample(list(self.state_action_mem), self.batch_size))
+            state_batches = torch.stack(states, dim=0)
+            action_batches = torch.stack(actions, dim=0)
+
+            next_state_pred, rewards = self.wm.predict(state_batches, action_batches)
+            return state_batches, action_batches, next_state_pred, rewards
         
     def retrieve_all(self):
         batch = self.transition(*zip(*self.replay_memory))
@@ -87,3 +88,7 @@ class DynaDQNAgent(DQNAgent):
         actions = torch.stack(batch.action)
         next_states = batch.next_state
         return states, actions, next_states, rewards
+    
+    def retain_experience(self, *args):
+        self.replay_memory.append(self.transition(*args))
+        self.state_action_mem.add((args[:2]))
