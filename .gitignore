@@ -8,3 +8,4 @@ notes.txt
 # other
 *.xlsx
 *.vscode
+*.pyc
