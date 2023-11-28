@@ -7,13 +7,19 @@ from sklearn.preprocessing import StandardScaler
 class FeatureGenerator:
 
     def __init__(self, data:pd.DataFrame, task="classification") -> None:
+        task = task.lower()
         self.task_guard(task)
         self.df = data
         if task == "classification":
             self._create_classes()
         elif task == "regression":
             self._create_regression_target()
+        elif task == "agent_env":
+            self._create_env_history()
         self.training_features = []
+    
+    def _create_env_history(self):
+        self.df.drop(columns=["Date", "Close"], inplace=True)
 
     def _create_regression_target(self, reg_tgt="log pct returns"):
         if reg_tgt == "log pct returns":
@@ -80,5 +86,5 @@ class FeatureGenerator:
 
     @staticmethod
     def task_guard(task):
-        assert task in ["classification", "regression"], \
-        "the task specification must be either classification or regression"
+        assert task.lower() in ["classification", "regression", "agent_env"], \
+        "the task specification must be either classification, agent_env or regression"

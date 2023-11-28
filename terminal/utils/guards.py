@@ -18,3 +18,8 @@ def non_linearity_guard(activation):
     
 def shape_guard(tensor1, tensor2):
     assert tensor1.shape == tensor2.shape, f"tensor 1 has shape: {tensor1.shape}, whilst tensor 2 has shape: {tensor2.shape}"
+
+def stock_ticker_guard(ticker_symbol):
+    ticker_symbol = ticker_symbol.upper()
+    allowed = {"AAPL"}
+    assert ticker_symbol in allowed, "The ticker symbol must be in AAPL, "
