@@ -12,34 +12,26 @@ import torch.optim as optim
 import torch.nn.functional as F
 from models.feed_forward_network import FeedForward
 from terminal.models.deep_q_agent import DQNAgent
-from models.linear_world_model import LinearWorldModel, NNWorldModel
+from terminal.models.nn_world_model import LinearWorldModel, NNWorldModel
 
 from IPython import display
 is_ipython = 'inline' in matplotlib.get_backend()
 
 class DynaDQNAgent(DQNAgent):
 
-    def __init__(self, *dqn_args, planning_steps=50, **dqn_kwargs):
+    def __init__(self, *dqn_args, planning_steps=50, world_hidden_size=8, non_linearity='gelu', **dqn_kwargs):
         super().__init__(*dqn_args, **dqn_kwargs)
         self.planning_steps = planning_steps
         self.dyna = False
         self.state_action_mem = set()
-        self.wm = NNWorldModel(device=self.device)
+        self.wm = NNWorldModel(self.n_actions, self.n_obs, hidden_size=world_hidden_size, non_linearity=non_linearity, device=self.device)
 
     def step_action_value_function(self):
-
-        #self.state_transition_predictor.train()
-        #self.reward_predictor.train()
 
         if self.get_memory_len() < self.train_threshold:
             return
 
-        #state_loss, reward_loss = self.get_world_model_loss()
-
         loss = self.get_network_loss()
-
-            #self.backprop_network(state_loss)
-            #self.backprop_network(reward_loss)
         self.backprop_network(loss, self.gradient_clipping > 0 or self.gradient_norm_clipping > 0)
             
         self.construct_world_model()
@@ -52,12 +44,10 @@ class DynaDQNAgent(DQNAgent):
         self.wm.observe(*self.retrieve_batch_info())
 
     def dyna_planning_steps(self):
-        #self.state_transition_predictor.eval()
-        #self.reward_predictor.eval()
         self.dyna = True
         for s in range(self.planning_steps):
             loss = self.get_network_loss()
-            for g in optim.param_groups:
+            for g in self.optimizer.param_groups:
                 g['lr'] *= 0.1
             self.backprop_network(loss)
             if self.double_dqn:
@@ -65,7 +55,7 @@ class DynaDQNAgent(DQNAgent):
                     self.perform_soft_target_update()
                 elif self.target_net_update == "hard":
                     self.perform_hard_target_update()
-        for g in optim.param_groups:
+        for g in self.optimizer.param_groups:
             g['lr'] *= 10
         self.dyna = False
 

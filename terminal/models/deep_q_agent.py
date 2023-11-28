@@ -94,7 +94,7 @@ class DQNAgent(Agent):
         
         for ep in range(episodes):
             state, _ = self.env.reset()
-            state = torch.tensor(state).to(self.device)
+            state = torch.tensor(state, dtype=torch.float32).to(self.device)
             for t in count():
                 # agent chooses an action
                 action = self.get_action(state)
@@ -210,10 +210,13 @@ class DQNAgent(Agent):
         self.backprop_network(loss, self.gradient_clipping > 0 or self.gradient_norm_clipping > 0)
 
     def get_network_loss(self):
-        states, actions, next_states, rewards = self.retrieve_batch_info()
 
-        non_terminal_mask = torch.tensor(tuple(map(lambda ns:ns is not None, next_states)), device=self.device, dtype=torch.bool)
-        non_terminal_states = torch.stack([ns for ns in next_states if ns is not None]).to(self.device)
+        non_terminal_states = torch.tensor([])
+
+        while not non_terminal_states.shape[0]:
+            states, actions, next_states, rewards = self.retrieve_batch_info()
+            non_terminal_mask = torch.tensor(tuple(map(lambda ns:ns is not None, next_states)), device=self.device, dtype=torch.bool)
+            non_terminal_states = torch.stack([ns for ns in next_states if ns is not None]).to(self.device)
 
         current_estimate = torch.gather(self.net(states), 1, actions)
         q_estimate = torch.zeros(self.batch_size, device=self.device)
@@ -223,7 +226,7 @@ class DQNAgent(Agent):
             else:
                 q_estimate[non_terminal_mask] = (self.discount * torch.max(self.net(non_terminal_states), dim=1)[0])
 
-        target = q_estimate + rewards
+        target = q_estimate.unsqueeze(1) + rewards
         shape_guard(current_estimate, target)
         loss = self.loss_fn(current_estimate, target)
         return loss
