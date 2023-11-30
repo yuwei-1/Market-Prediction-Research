@@ -1,10 +1,13 @@
 from abc import abstractmethod, ABC
+from collections import namedtuple
 
 
 class ReinforcementLearningEnvironment:
 
     def __init__(self) -> None:
-        pass
+        self.Aspace = namedtuple('action_space', ('n', 'sample'))
+        self.Obspace = namedtuple('observation_space', 'shape')
+        self.actions = {"hold":2, "buy":1, "sell":0}
 
     @abstractmethod
     def make(self):

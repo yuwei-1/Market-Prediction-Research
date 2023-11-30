@@ -4,6 +4,8 @@ from data_processing.csv_reader import CSVReader
 from utils.guards import stock_ticker_guard
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
+import numpy as np
+import random
 import pandas as pd
 
 class StockEnvironment(ReinforcementLearningEnvironment):
@@ -19,17 +21,19 @@ class StockEnvironment(ReinforcementLearningEnvironment):
         # Check if the ticker symbol is valid
         stock_ticker_guard(ticker)
 
+        # TODO: clean up this
         # Get file from raw data folder
         file_name = f"{ticker.upper()}.csv"
         csvr = CSVReader(path=folder_path + file_name)
         df = csvr.get_df()
 
         fg = FeatureGenerator(df, task="agent_env")
-        fg.apply_bollinger_bands(period=20, target="Adj Close")
+        fg.apply_IG_top_ten_indicators()
 
         data = fg.df
         data.dropna(inplace=True)
         self.close_idx = data.columns.get_loc("Adj Close")
+        print("The following features are in use: ", data.columns)
         
         data = data.to_numpy()
         scaler = StandardScaler()
@@ -41,22 +45,36 @@ class StockEnvironment(ReinforcementLearningEnvironment):
         self.X_train = X_train
         self.X_test = X_test
 
+        self.action_space = self.Aspace(len(self.actions), self.sample)
+        self.observation_space = self.Obspace((X_train.shape[1],))
+
     def stock_generator(self):
         for i in range(self.X_train.shape[0]):
             yield self.X_train[i, :]
         return None
 
     def step(self, action):
-
         next_state = next(self.gen)
         curr_price = next_state[self.close_idx]
 
         if action == 0:
-            self.stock_information["qty"] -= 1
+            # sell
+            self.stock_information["qty"] = -1
         elif action == 1:
-            self.stock_information["qty"] += 1
-            
-        reward = self.stock_information["qty"] * (curr_price - self.prev_price)/self.prev_price
+            # buy
+            self.stock_information["qty"] = 1
+        else:
+            # hold
+            self.stock_information["qty"] = 0
+        
+        pred_result = self.stock_information["qty"]*(curr_price - self.prev_price)
+
+        if pred_result > 0:
+            reward = 1
+        elif pred_result == 0:
+            reward = 0
+        else:
+            reward = -1
         
         if next_state is None:
             terminated = True
@@ -64,7 +82,7 @@ class StockEnvironment(ReinforcementLearningEnvironment):
             terminated = False
 
         self.prev_price = curr_price
-        return next_state, reward, terminated
+        return next_state.astype(np.float32), reward, terminated
         
     def make_portfolio(self):
         self.stock_information = {"qty":0}
@@ -74,4 +92,7 @@ class StockEnvironment(ReinforcementLearningEnvironment):
         self.gen = self.stock_generator()
         state = next(self.gen)
         self.prev_price = state[self.close_idx]
-        return state
+        return state.astype(np.float32)
+    
+    def sample(self):
+        return random.sample(range(len(self.actions)), 1)[0]

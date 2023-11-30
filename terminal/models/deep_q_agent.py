@@ -12,6 +12,7 @@ import torch.optim as optim
 import torch.nn.functional as F
 from models.feed_forward_network import FeedForward
 from terminal.models.reinforcement_learning_agent import Agent
+from environments.stock_env import StockEnvironment
 from utils.guards import shape_guard
 
 from IPython import display
@@ -57,7 +58,11 @@ class DQNAgent(Agent):
         self.stats = "training"
         
     def init_env(self, environment, render_mode="human"):
-        env = gym.make(environment, render_mode=render_mode)
+        if environment in {"AAPL"}:
+            env = StockEnvironment()
+            env.make(environment, "raw_data/")
+        else:
+            env = gym.make(environment, render_mode=render_mode)
         n_actions = env.action_space.n
         n_obs = env.observation_space.shape[0]
         return env, n_obs, n_actions
@@ -78,7 +83,7 @@ class DQNAgent(Agent):
         '''
         Optimizer should be passed in as a lambda function only accepting the model parameters and learning rate
         '''
-        
+        self.episodes = episodes
         self.title = title if title else self.environment
         self.discount = discount
         self.batch_size = batch_size
@@ -87,12 +92,19 @@ class DQNAgent(Agent):
         self.optimizer = optimizer(self.net.parameters(), learning_rate)
         self.steps_done = 0
         self.episode_durations = []
+        self.plot = plot
         
         self.net.train()
         if self.double_dqn:
             self.target_net.train()
         
-        for ep in range(episodes):
+        if self.environment in {"AAPL"}:
+            self.continuous_environment()
+        else:
+            self.episodic_environments()
+
+    def episodic_environments(self):
+        for ep in range(self.episodes):
             state, _ = self.env.reset()
             state = torch.tensor(state, dtype=torch.float32).to(self.device)
             for t in count():
@@ -115,10 +127,9 @@ class DQNAgent(Agent):
                 # terminate the episode under stopping conditions
                 if terminated or truncated:
                     self.episode_durations.append(t+1)
-                    if plot:
+                    if self.plot:
                         self.plot_durations()
                     break
-                
                 if self.double_dqn:
                     if self.target_net_update == "soft":
                         self.perform_soft_target_update()
@@ -128,8 +139,43 @@ class DQNAgent(Agent):
                 self.steps_done += 1
 
         self.env.close()
-        if plot:
-            self.plot_final(title=title)
+        if self.plot:
+            self.plot_final(title=self.title)
+
+    def continuous_environment(self):
+            cum_return = 0
+            state = self.env.reset()
+            state = torch.tensor(state, dtype=torch.float32).to(self.device)
+            for t in count():
+                # agent chooses an action
+                action = self.get_action(state)
+                # observe new obs from environment
+                next_state, reward, terminated = self.env.step(action.item())
+                cum_return += reward
+                # logic for different scenarios
+                if terminated:
+                    next_state = None
+                else:
+                    next_state = torch.tensor(next_state, dtype=torch.float32).to(self.device)
+                # save experience to replay memory
+                reward = torch.tensor([reward], dtype=torch.float32).to(self.device)
+                self.retain_experience(state, action, next_state, reward)
+                # change current state
+                state = next_state
+                # learn from some past experiences
+                self.step_action_value_function()
+                # terminate the episode under stopping conditions
+
+                self.episode_durations.append(cum_return)
+                if self.plot:
+                    self.plot_durations()
+
+                if self.double_dqn:
+                    if self.target_net_update == "soft":
+                        self.perform_soft_target_update()
+                    elif self.target_net_update == "hard":
+                        self.perform_hard_target_update()
+                self.steps_done += 1
 
     def plot_durations(self, show_result=False):
         # TODO: change up code, so not entirely identical
@@ -244,7 +290,7 @@ class DQNAgent(Agent):
     def retrieve_batch_info(self):
         batch = self.transition(*zip(*self.recall_experience(self.batch_size)))
         states = torch.stack(batch.state)
-        rewards = torch.stack(batch.reward)
+        rewards = torch.stack(batch.reward).to(torch.float32)
         actions = torch.stack(batch.action)
         next_states = batch.next_state
         return states, actions, next_states, rewards
@@ -261,7 +307,6 @@ class DQNAgent(Agent):
             # greedy: choose action with largest value
             with torch.no_grad():
                 return torch.argmax(self.net(state)).unsqueeze(0)
-
 
     def init_agent_memory(self):
         return deque([], maxlen=self.mem_length)
