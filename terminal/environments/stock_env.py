@@ -7,6 +7,7 @@ from sklearn.model_selection import train_test_split
 import numpy as np
 import random
 import pandas as pd
+from copy import deepcopy
 
 class StockEnvironment(ReinforcementLearningEnvironment):
     '''
@@ -17,82 +18,59 @@ class StockEnvironment(ReinforcementLearningEnvironment):
     def __init__(self) -> None:
         super().__init__()
     
-    def make(self, ticker, folder_path):
+    def make(self, ticker, folder_path, prediction_period=1):
         # Check if the ticker symbol is valid
         stock_ticker_guard(ticker)
 
-        # TODO: clean up this
-        # Get file from raw data folder
-        file_name = f"{ticker.upper()}.csv"
-        csvr = CSVReader(path=folder_path + file_name)
-        df = csvr.get_df()
-
-        fg = FeatureGenerator(df, task="agent_env")
+        path_to_file = folder_path + f"{ticker.upper()}.csv"
+        csvr = CSVReader(path=path_to_file)
+        fg = FeatureGenerator(csvr.get_df(), task="custom")
+    
+        fg._create_classes(period=prediction_period)
         fg.apply_IG_top_ten_indicators()
-
-        data = fg.df
-        data.dropna(inplace=True)
-        self.close_idx = data.columns.get_loc("Adj Close")
-        print("The following features are in use: ", data.columns)
+        self.X_train, self.X_test, self.y_train, self.y_test = fg.create_modelling_data(features=["Volume", "Adj Close"], target="Profit")
         
-        data = data.to_numpy()
-        scaler = StandardScaler()
-
-        X_train, X_test = train_test_split(data, random_state=123, test_size=0.2)
-        X_train = scaler.fit_transform(X_train)
-        X_test = scaler.transform(X_test)
-
-        self.X_train = X_train
-        self.X_test = X_test
-
         self.action_space = self.Aspace(len(self.actions), self.sample)
-        self.observation_space = self.Obspace((X_train.shape[1],))
+        self.observation_space = self.Obspace((self.X_train.shape[1],))
+        print("The following derived features are in use: ", fg.training_features)
 
-    def stock_generator(self):
-        for i in range(self.X_train.shape[0]):
-            yield self.X_train[i, :]
-        return None
+    def stock_generator(self, dataset):
+        if dataset == "train":
+            for i in range(self.X_train.shape[0]):
+                yield self.X_train[i, :], self.y_train[i]
+        elif dataset == "test":
+            for i in range(self.X_test.shape[0]):
+                yield self.X_test[i, :], self.y_test[i]
 
     def step(self, action):
-        next_state = next(self.gen)
-        curr_price = next_state[self.close_idx]
 
-        if action == 0:
-            # sell
-            self.stock_information["qty"] = -1
-        elif action == 1:
-            # buy
-            self.stock_information["qty"] = 1
-        else:
-            # hold
-            self.stock_information["qty"] = 0
-        
-        pred_result = self.stock_information["qty"]*(curr_price - self.prev_price)
+        terminated = False
+        truncated = False
 
-        if pred_result > 0:
+        if action == self.expected_action:
             reward = 1
-        elif pred_result == 0:
-            reward = 0
         else:
             reward = -1
-        
-        if next_state is None:
-            terminated = True
-        else:
-            terminated = False
 
-        self.prev_price = curr_price
-        return next_state.astype(np.float32), reward, terminated
+        try:
+            next_state, self.expected_action = next(self.gen)
+        except:
+            next_state = None
+            terminated = True
+
+        return next_state, reward, terminated, truncated, None
         
     def make_portfolio(self):
-        self.stock_information = {"qty":0}
+        pass
 
-    def reset(self):
+    def reset(self, dataset='train'):
         self.make_portfolio()
-        self.gen = self.stock_generator()
-        state = next(self.gen)
-        self.prev_price = state[self.close_idx]
-        return state.astype(np.float32)
+        self.gen = self.stock_generator(dataset)
+        state, self.expected_action = next(self.gen)
+        return state, None
+
+    def close(self):
+        pass
     
     def sample(self):
         return random.sample(range(len(self.actions)), 1)[0]

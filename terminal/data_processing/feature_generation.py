@@ -10,28 +10,31 @@ class FeatureGenerator:
         task = task.lower()
         self.task_guard(task)
         self.df = data
+        self._remove_unused_columns()
         if task == "classification":
             self._create_classes()
         elif task == "regression":
             self._create_regression_target()
-        elif task == "agent_env":
-            self._create_env_history()
         self.training_features = []
     
-    def _create_env_history(self):
-        self.df.drop(columns=["Date", "Close"], inplace=True)
+    def _remove_unused_columns(self, unused={"Date", "Close", "Open", "High", "Low"}):
+        for col in self.df.columns:
+            if col in unused:
+                self.df.drop(columns=[col], inplace=True)
 
     def _create_regression_target(self, reg_tgt="log pct returns"):
         if reg_tgt == "log pct returns":
-            self.df["returns"] = self.df["Close"].pct_change()
+            self.df["returns"] = self.df["Adj Close"].pct_change()
             self.df["log_returns"] = np.log(1 + self.df["returns"])
         elif reg_tgt == "returns":
-            self.df["returns"] = self.df["Close"].pct_change()
+            self.df["returns"] = self.df["Adj Close"].pct_change()
     
-    def _create_classes(self):
-        self.df["Next Close"] = self.df["Adj Close"].shift(1)
-        self.df["Difference"] = self.df["Adj Close"] - self.df["Next Close"]
+    def _create_classes(self, period=1):
+        self.df["Next Close"] = self.df["Adj Close"].shift(period)
+        self.df["Difference"] = self.df["Next Close"] - self.df["Adj Close"]
         self.df["Profit"] = (self.df["Difference"] > 0).astype(int)
+        self.df["Profit"] = self.df["Profit"].shift(-period)
+        self.df.drop(self.df.tail(period).index,inplace=True)
 
     def apply_IG_top_ten_indicators(self):
         # bbands
@@ -104,8 +107,8 @@ class FeatureGenerator:
         self.df = self.df.dropna()
         features += self.training_features
 
-        X = self.df[features]
-        y = self.df[target]
+        X = self.df[features].to_numpy()
+        y = self.df[target].to_numpy()
 
         scaler = StandardScaler()
         X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=random_state, test_size=test_split)
@@ -118,5 +121,5 @@ class FeatureGenerator:
 
     @staticmethod
     def task_guard(task):
-        assert task.lower() in ["classification", "regression", "agent_env"], \
-        "the task specification must be either classification, agent_env or regression"
+        assert task.lower() in ["classification", "regression", "custom"], \
+        "the task specification must be either classification, regression or custom"

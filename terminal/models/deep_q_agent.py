@@ -3,6 +3,7 @@ import random
 import matplotlib
 import matplotlib.pyplot as plt
 import pandas as pd
+import numpy as np
 from collections import namedtuple, deque
 from itertools import count
 
@@ -79,6 +80,7 @@ class DQNAgent(Agent):
               learning_rate=0.0001,
               optimizer=lambda param, lr: optim.AdamW(param, lr=lr, amsgrad=True), 
               loss=nn.MSELoss(),
+              continuous=False,
               plot=False):
         '''
         Optimizer should be passed in as a lambda function only accepting the model parameters and learning rate
@@ -93,64 +95,26 @@ class DQNAgent(Agent):
         self.steps_done = 0
         self.episode_durations = []
         self.plot = plot
+
+        # if continuous:
+        #     self.episodes = 1
         
         self.net.train()
         if self.double_dqn:
             self.target_net.train()
         
-        if self.environment in {"AAPL"}:
-            self.continuous_environment()
-        else:
-            self.episodic_environments()
+        self.train_loop(continuous=continuous)
 
-    def episodic_environments(self):
+    def train_loop(self, continuous=False):
         for ep in range(self.episodes):
             state, _ = self.env.reset()
             state = torch.tensor(state, dtype=torch.float32).to(self.device)
+            cum_return = 0
             for t in count():
                 # agent chooses an action
                 action = self.get_action(state)
                 # observe new obs from environment
                 next_state, reward, terminated, truncated, _ = self.env.step(action.item())
-                # logic for different scenarios
-                if terminated:
-                    next_state = None
-                else:
-                    next_state = torch.tensor(next_state).to(self.device)
-                # save experience to replay memory
-                reward = torch.tensor([reward]).to(self.device)
-                self.retain_experience(state, action, next_state, reward)
-                # change current state
-                state = next_state
-                # learn from some past experiences
-                self.step_action_value_function()
-                # terminate the episode under stopping conditions
-                if terminated or truncated:
-                    self.episode_durations.append(t+1)
-                    if self.plot:
-                        self.plot_durations()
-                    break
-                if self.double_dqn:
-                    if self.target_net_update == "soft":
-                        self.perform_soft_target_update()
-                    elif self.target_net_update == "hard":
-                        self.perform_hard_target_update()
-
-                self.steps_done += 1
-
-        self.env.close()
-        if self.plot:
-            self.plot_final(title=self.title)
-
-    def continuous_environment(self):
-            cum_return = 0
-            state = self.env.reset()
-            state = torch.tensor(state, dtype=torch.float32).to(self.device)
-            for t in count():
-                # agent chooses an action
-                action = self.get_action(state)
-                # observe new obs from environment
-                next_state, reward, terminated = self.env.step(action.item())
                 cum_return += reward
                 # logic for different scenarios
                 if terminated:
@@ -165,17 +129,22 @@ class DQNAgent(Agent):
                 # learn from some past experiences
                 self.step_action_value_function()
                 # terminate the episode under stopping conditions
-
-                self.episode_durations.append(cum_return)
-                if self.plot:
-                    self.plot_durations()
-
+                if continuous or terminated or truncated:
+                    self.episode_durations.append(cum_return)
+                    if self.plot:
+                        self.plot_durations()
+                    if terminated or truncated:
+                        break
                 if self.double_dqn:
                     if self.target_net_update == "soft":
                         self.perform_soft_target_update()
                     elif self.target_net_update == "hard":
                         self.perform_hard_target_update()
                 self.steps_done += 1
+
+        self.env.close()
+        if self.plot:
+            self.plot_final(title=self.title)
 
     def plot_durations(self, show_result=False):
         # TODO: change up code, so not entirely identical
@@ -204,8 +173,26 @@ class DQNAgent(Agent):
                 display.display(plt.gcf())
 
     def test(self):
-        # TODO write code to test DQN
-        pass
+        # code for testing stock predictive performance of DQN
+        self.net.eval()
+        state, _ = self.env.reset(dataset='test')
+        state = torch.tensor(state, dtype=torch.float32).to(self.device)
+        actions = []
+        for t in count():
+            action = self.get_action(state, explore=False).item()
+            actions += [action]
+            next_state, reward, terminated, truncated, _ = self.env.step(action)
+            if next_state is not None:
+                next_state = torch.tensor(next_state, dtype=torch.float32).to(self.device)
+            if terminated:
+                break
+            state = next_state
+        optimal = self.env.y_test[1:]
+        actions = np.array(actions[:-1])
+        acc = (optimal == actions).sum()/optimal.shape[0]
+
+        print(f"test score: {acc}")
+        return actions, optimal
 
     def save(self, file_path):
         net_state_dict = self.net.state_dict()
@@ -295,12 +282,12 @@ class DQNAgent(Agent):
         next_states = batch.next_state
         return states, actions, next_states, rewards
     
-    def get_action(self, state):
+    def get_action(self, state, explore=True):
         # TODO: how to refactor this so can use other behaviour policies?
 
         ep_threshold = self.epsilon_greedy(self.steps_done)
         rand = random.uniform(0,1)
-        if rand <= ep_threshold:
+        if rand <= ep_threshold and explore:
             # choose random action
             return torch.tensor([self.env.action_space.sample()], device=self.device, dtype=torch.long)
         else:

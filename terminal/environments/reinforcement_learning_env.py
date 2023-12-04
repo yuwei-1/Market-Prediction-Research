@@ -7,7 +7,7 @@ class ReinforcementLearningEnvironment:
     def __init__(self) -> None:
         self.Aspace = namedtuple('action_space', ('n', 'sample'))
         self.Obspace = namedtuple('observation_space', 'shape')
-        self.actions = {"hold":2, "buy":1, "sell":0}
+        self.actions = {"buy":1, "sell":0}
 
     @abstractmethod
     def make(self):
@@ -23,4 +23,8 @@ class ReinforcementLearningEnvironment:
 
     @abstractmethod
     def make_portfolio(self):
+        pass
+
+    @abstractmethod
+    def close(self):
         pass
