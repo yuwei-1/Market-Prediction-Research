@@ -4,9 +4,10 @@ from sklearn.gaussian_process import GaussianProcessClassifier
 from copy import deepcopy
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
+from feature_selection.ifeature_selector import IFeatureSelector
 from tqdm import tqdm
 
-class RecursiveFeatureSelection:
+class RecursiveFeatureSelection(IFeatureSelector):
     def __init__(self, 
                  data : pd.DataFrame, 
                  training_features : List[str], 
@@ -18,6 +19,9 @@ class RecursiveFeatureSelection:
         self.target_feature = target_feature
         self.min_features = min_features
         self.model = model
+
+    def plot(self):
+        pass
 
     def run(self):
         scores = []

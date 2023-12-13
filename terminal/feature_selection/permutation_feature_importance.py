@@ -1,12 +1,13 @@
 from sklearn.inspection import permutation_importance
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
+from feature_selection.ifeature_selector import IFeatureSelector
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 from typing import *
 
-class PermutationFeatureImportance:
+class PermutationFeatureImportance(IFeatureSelector):
 
     def __init__(self,
                  data : pd.DataFrame,
@@ -18,7 +19,7 @@ class PermutationFeatureImportance:
         self.target = target
         self.model = model
 
-    def calculate(self):
+    def run(self):
         X = self.data[self.training_features].to_numpy()
         y = self.data[self.target].to_numpy()
 
