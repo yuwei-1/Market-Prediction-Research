@@ -48,20 +48,38 @@ class FeatureGenerator:
         periods = [12, 26, 50, 200]
         self.apply_exponential_moving_average(periods=periods)
 
+    def apply_relative_strength_index(self, period=14):
+        column_name = f"{period} day RSI"
+        if "returns" not in self.df.columns:
+            self.df["returns"] = self.df["Adj Close"].pct_change()
+        self.df["gains"] = np.where(self.df["returns"] > 0, self.df["returns"], 0)
+        self.df["loss"] = np.where(self.df["returns"] < 0, np.abs(self.df["returns"]), 0)
+        self.df[f"{period} day average gains"] = self.df["gains"].rolling(period).mean()
+        self.df[f"{period} day average loss"] = self.df["loss"].rolling(period).mean()
+        relative_strength = self.df[f"{period} day average gains"] / self.df[f"{period} day average loss"]
+        self.df[column_name] = 100 - (100/(1 + relative_strength))
+
+    def apply_MACD_indicator(self, long_term=26, short_term=12, signal=9):
+        long_ema = self.apply_single_exponential_moving_average(period=long_term)
+        short_ema = self.apply_single_exponential_moving_average(period=short_term)
+        self.df[f"{long_term}/{short_term} macd"] = macd = short_ema - long_ema
+        self.df[f"{long_term}/{short_term} macd {signal} day signal"] = macd.ewm(span=signal, adjust=False).mean()
+        self.training_features += [f"{long_term}/{short_term} macd", f"{long_term}/{short_term} macd {signal} day signal"]
+
     def apply_moving_averages(self, periods:list or int, target="Adj Close"):        
         periods = list(periods) if isinstance(periods, int) else periods
         for p in periods:
             self._apply_single_moving_average(period=p, target=target)
 
     def _apply_single_moving_average(self, period:int, target="Adj Close"):
-        column_name = f"{period} day moving average"
+        column_name = f"{period} day simple moving average"
         self.training_features += [column_name]
         self.df[column_name] = col = self.df[target].rolling(period).mean()
         return col
 
     def _apply_single_moving_deviation(self, period:int, target="Adj Close"):
         column_name = f"{period} day moving deviation"
-        #self.training_features += [column_name]
+        self.training_features += [column_name]
         self.df[column_name] = col = self.df[target].rolling(period).std()
         return col
 
@@ -81,9 +99,10 @@ class FeatureGenerator:
     def apply_single_exponential_moving_average(self, period:int, target="Adj Close"):
         column_name = f"{period} day ema"
         self.training_features += [column_name]
-        self.df[column_name] = self.df[target].ewm(span=period, adjust=False).mean()
+        self.df[column_name] = col = self.df[target].ewm(span=period, adjust=False).mean()
+        return col
 
-    def apply_momentum(self, period:int, target="Adj Close"):
+    def apply_momentum(self, periods:list, target="Adj Close"):
         periods = list(periods) if isinstance(periods, int) else periods
         for p in periods:
             self.apply_single_momentum(period=p, target=target)

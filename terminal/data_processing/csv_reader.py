@@ -14,6 +14,3 @@ class CSVReader(DataReader):
 
     def get_df(self):
         return self.df
-    
-
-
