@@ -34,6 +34,7 @@ class DQNAgent(Agent):
                 gradient_clipping=-1,
                 gradient_norm_clipping=1,
                 activation='relu',
+                prediction_period=7,
                 **net_kwargs):
         
         self.mem_length = mem_length
@@ -43,6 +44,7 @@ class DQNAgent(Agent):
         self.eps_end = eps_end
         self.eps_decay_length = eps_decay_length
         self.environment = environment
+        self.prediction_period = prediction_period
         self.hard_update_interval = hard_update_interval
         self.activation = activation
         self.target_net_update = self.update_guard(target_net_update)
@@ -61,7 +63,7 @@ class DQNAgent(Agent):
     def init_env(self, environment, render_mode="human"):
         if environment in {"AAPL"}:
             env = StockEnvironment()
-            env.make(environment, "raw_data/")
+            env.make(environment, prediction_period=self.prediction_period)
         else:
             env = gym.make(environment, render_mode=render_mode)
         n_actions = env.action_space.n
@@ -106,6 +108,8 @@ class DQNAgent(Agent):
         self.train_loop(continuous=continuous)
 
     def train_loop(self, continuous=False):
+        if continuous:
+            self.test()
         for ep in range(self.episodes):
             state, _ = self.env.reset()
             state = torch.tensor(state, dtype=torch.float32).to(self.device)
@@ -141,6 +145,8 @@ class DQNAgent(Agent):
                     elif self.target_net_update == "hard":
                         self.perform_hard_target_update()
                 self.steps_done += 1
+            if continuous:
+                self.test()
 
         self.env.close()
         if self.plot:
@@ -156,7 +162,7 @@ class DQNAgent(Agent):
             plt.clf()
             plt.title(self.stats)
         plt.xlabel('Episode')
-        plt.ylabel('Duration')
+        plt.ylabel('Rewards')
         plt.plot(durations_t.numpy())
         # Take 100 episode averages and plot them too
         if len(durations_t) >= 100:
@@ -189,9 +195,11 @@ class DQNAgent(Agent):
             state = next_state
         optimal = self.env.y_test[1:]
         actions = np.array(actions[:-1])
-        acc = (optimal == actions).sum()/optimal.shape[0]
+        mask = ~(actions == 2)
+        acc = (optimal[mask] == actions[mask]).sum()/optimal[mask].shape[0]
 
         print(f"test score: {acc}")
+        self.stats = f"Training .. current test score = {acc}"
         return actions, optimal
 
     def save(self, file_path):

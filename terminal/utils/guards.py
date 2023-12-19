@@ -21,5 +21,5 @@ def shape_guard(tensor1, tensor2):
 
 def stock_ticker_guard(ticker_symbol):
     ticker_symbol = ticker_symbol.upper()
-    allowed = {"AAPL"}
+    allowed = {"AAPL", "GOOGL"}
     assert ticker_symbol in allowed, "The ticker symbol must be in AAPL, "

@@ -1,6 +1,7 @@
 from environments.reinforcement_learning_env import ReinforcementLearningEnvironment
 from data_processing.feature_generation import FeatureGenerator
 from data_processing.csv_reader import CSVReader
+from data_processing.y_finance_reader import YahooFinanceReader
 from utils.guards import stock_ticker_guard
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
@@ -18,17 +19,18 @@ class StockEnvironment(ReinforcementLearningEnvironment):
     def __init__(self) -> None:
         super().__init__()
     
-    def make(self, ticker, folder_path, prediction_period=1):
+    def make(self, ticker, prediction_period=1):
         # Check if the ticker symbol is valid
         stock_ticker_guard(ticker)
 
-        path_to_file = folder_path + f"{ticker.upper()}.csv"
-        csvr = CSVReader(path=path_to_file)
-        fg = FeatureGenerator(csvr.get_df(), task="custom")
+        yahoo_adjust_close = "Close"
+        reader = YahooFinanceReader()
+        stock = reader.read_stock_price_data(ticker)
+        fg = FeatureGenerator(stock, task="custom", target_variable=yahoo_adjust_close)
     
         fg._create_classes(period=prediction_period)
         fg.apply_IG_top_ten_indicators()
-        self.X_train, self.X_test, self.y_train, self.y_test = fg.create_modelling_data(features=["Volume", "Adj Close"], target="Profit")
+        self.X_train, self.X_test, self.y_train, self.y_test = fg.create_modelling_data(features=["Volume", yahoo_adjust_close], target="Profit")
         
         self.action_space = self.Aspace(len(self.actions), self.sample)
         self.observation_space = self.Obspace((self.X_train.shape[1],))
@@ -49,6 +51,8 @@ class StockEnvironment(ReinforcementLearningEnvironment):
 
         if action == self.expected_action:
             reward = 1
+        elif action == 2:
+            reward = 0
         else:
             reward = -1
 

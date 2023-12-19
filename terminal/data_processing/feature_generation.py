@@ -6,10 +6,11 @@ from sklearn.preprocessing import StandardScaler
 
 class FeatureGenerator:
 
-    def __init__(self, data:pd.DataFrame, task="classification") -> None:
+    def __init__(self, data:pd.DataFrame, task="classification", target_variable="Adj Close") -> None:
         task = task.lower()
         self.task_guard(task)
         self.df = data
+        self.target_variable = target_variable
         self._remove_unused_columns()
         if task == "classification":
             self._create_classes()
@@ -17,41 +18,47 @@ class FeatureGenerator:
             self._create_regression_target()
         self.training_features = []
     
-    def _remove_unused_columns(self, unused={"Date", "Close", "Open", "High", "Low"}):
+    def _remove_unused_columns(self, unused={"Date", "Open", "High", "Low", "Dividends", "Stock Splits"}):
         for col in self.df.columns:
             if col in unused:
                 self.df.drop(columns=[col], inplace=True)
 
     def _create_regression_target(self, reg_tgt="log pct returns"):
         if reg_tgt == "log pct returns":
-            self.df["returns"] = self.df["Adj Close"].pct_change()
+            self.df["returns"] = self.df[self.target_variable].pct_change()
             self.df["log_returns"] = np.log(1 + self.df["returns"])
         elif reg_tgt == "returns":
-            self.df["returns"] = self.df["Adj Close"].pct_change()
+            self.df["returns"] = self.df[self.target_variable].pct_change()
     
     def _create_classes(self, period=1):
-        self.df["Next Close"] = self.df["Adj Close"].shift(period)
-        self.df["Difference"] = self.df["Next Close"] - self.df["Adj Close"]
+        self.df["Next Close"] = self.df[self.target_variable].shift(-period)
+        self.df["Difference"] = self.df["Next Close"] - self.df[self.target_variable]
         self.df["Profit"] = (self.df["Difference"] > 0).astype(int)
-        self.df["Profit"] = self.df["Profit"].shift(-period)
+        #self.df["Profit"] = self.df["Profit"].shift(period)
         self.df.drop(self.df.tail(period).index,inplace=True)
 
     def apply_IG_top_ten_indicators(self):
         # bbands
-        self.apply_bollinger_bands(period=20)
+        self.apply_bollinger_bands(period=7)
 
         # moving averages
-        periods = [50,200]
+        periods = [7, 14, 30, 100]
         self.apply_moving_averages(periods=periods)
 
         # emas
-        periods = [12, 26, 50, 200]
+        periods = [7, 14, 30, 100]
         self.apply_exponential_moving_average(periods=periods)
+
+        # RSI
+        self.apply_relative_strength_index(period=7)
+
+        # MACD
+        self.apply_MACD_indicator()
 
     def apply_relative_strength_index(self, period=14):
         column_name = f"{period} day RSI"
         if "returns" not in self.df.columns:
-            self.df["returns"] = self.df["Adj Close"].pct_change()
+            self.df["returns"] = self.df[self.target_variable].pct_change()
         self.df["gains"] = np.where(self.df["returns"] > 0, self.df["returns"], 0)
         self.df["loss"] = np.where(self.df["returns"] < 0, np.abs(self.df["returns"]), 0)
         self.df[f"{period} day average gains"] = self.df["gains"].rolling(period).mean()
@@ -66,66 +73,69 @@ class FeatureGenerator:
         self.df[f"{long_term}/{short_term} macd {signal} day signal"] = macd.ewm(span=signal, adjust=False).mean()
         self.training_features += [f"{long_term}/{short_term} macd", f"{long_term}/{short_term} macd {signal} day signal"]
 
-    def apply_moving_averages(self, periods:list or int, target="Adj Close"):        
+    def apply_moving_averages(self, periods:list or int):        
         periods = list(periods) if isinstance(periods, int) else periods
         for p in periods:
-            self._apply_single_moving_average(period=p, target=target)
+            self._apply_single_moving_average(period=p)
 
-    def _apply_single_moving_average(self, period:int, target="Adj Close"):
+    def _apply_single_moving_average(self, period:int):
         column_name = f"{period} day simple moving average"
         self.training_features += [column_name]
-        self.df[column_name] = col = self.df[target].rolling(period).mean()
+        self.df[column_name] = col = self.df[self.target_variable].rolling(period).mean()
         return col
 
-    def _apply_single_moving_deviation(self, period:int, target="Adj Close"):
+    def _apply_single_moving_deviation(self, period:int):
         column_name = f"{period} day moving deviation"
         self.training_features += [column_name]
-        self.df[column_name] = col = self.df[target].rolling(period).std()
+        self.df[column_name] = col = self.df[self.target_variable].rolling(period).std()
         return col
 
-    def apply_bollinger_bands(self, period:int, target="Adj Close"):
-        ma = self._apply_single_moving_average(period=period, target=target)
-        std = self._apply_single_moving_deviation(period=period, target=target)
+    def apply_bollinger_bands(self, period:int):
+        ma = self._apply_single_moving_average(period=period)
+        std = self._apply_single_moving_deviation(period=period)
         col_names = [f"{period} day lower bband", f"{period} day upper bband"]
         self.training_features += col_names
         self.df[col_names[0]] = ma - 2*std
         self.df[col_names[1]] = ma + 2*std
     
-    def apply_exponential_moving_average(self, periods:list or int, target="Adj Close"):        
+    def apply_exponential_moving_average(self, periods:list or int):        
         periods = list(periods) if isinstance(periods, int) else periods
         for p in periods:
-            self.apply_single_exponential_moving_average(period=p, target=target)
+            self.apply_single_exponential_moving_average(period=p)
 
-    def apply_single_exponential_moving_average(self, period:int, target="Adj Close"):
+    def apply_single_exponential_moving_average(self, period:int):
         column_name = f"{period} day ema"
         self.training_features += [column_name]
-        self.df[column_name] = col = self.df[target].ewm(span=period, adjust=False).mean()
+        self.df[column_name] = col = self.df[self.target_variable].ewm(span=period, adjust=False).mean()
         return col
 
-    def apply_momentum(self, periods:list, target="Adj Close"):
+    def apply_momentum(self, periods:list):
         periods = list(periods) if isinstance(periods, int) else periods
         for p in periods:
-            self.apply_single_momentum(period=p, target=target)
+            self.apply_single_momentum(period=p)
 
-    def apply_single_momentum(self, period:int, target="Adj Close"):
+    def apply_single_momentum(self, period:int):
         column_name = f"{period} day momentum"
         self.training_features += [column_name]
-        self.df[column_name] = self.df[target].pct_change(period)
+        self.df[column_name] = self.df[self.target_variable].pct_change(period)
 
-    def apply_moving_cumulation(self, periods:list or int, target="Adj Close"):
+    def apply_moving_cumulation(self, periods:list or int):
         periods = list(periods) if isinstance(periods, int) else periods
         for p in periods:
-            self._apply_single_moving_cumulation(period=p, target=target)
+            self._apply_single_moving_cumulation(period=p)
     
-    def _apply_single_moving_cumulation(self, period, target="Adj Close"):
+    def _apply_single_moving_cumulation(self, period):
         column_name = f"{period} day cumulation"
         self.training_features += [column_name]
-        self.df[column_name] = self.df[target].rolling(period).sum()
+        self.df[column_name] = self.df[self.target_variable].rolling(period).sum()
 
-    def create_modelling_data(self, features:list, target:str, random_state=123, val_split=0.1, test_split=0.2):
+    def create_modelling_data(self, features:list, target:str, last_n_years=4, random_state=123, test_split=0.2):
         self.df = self.df.dropna()
-        features += self.training_features
+        latest = self.df.index[-1]
+        earliest = latest - pd.DateOffset(years=last_n_years)
+        self.df = self.df[earliest : latest]
 
+        features += self.training_features
         X = self.df[features].to_numpy()
         y = self.df[target].to_numpy()
 
