@@ -1,5 +1,7 @@
 import pandas as pd
 import numpy as np
+import sys
+sys.path.append(r"C:\Users\YuweiZhu\OneDrive - Alloyed\Documents\Market-Prediction-Research\terminal")
 from data_processing.reader import DataReader
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler

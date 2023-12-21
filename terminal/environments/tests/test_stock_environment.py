@@ -2,11 +2,11 @@ import unittest
 import sys
 import gymnasium
 import numpy as np
-sys.path.append("C:/Users/YuweiZhu/OneDrive - Alloyed/Documents/Market-Prediction-Research/")
-sys.path.append("C:/Users/YuweiZhu/OneDrive - Alloyed/Documents/Market-Prediction-Research/terminal")
-from models.deep_q_agent import DQNAgent
-from models.feed_forward_network import FeedForward
-from environments.stock_env import StockEnvironment
+sys.path.append(r"C:\Users\YuweiZhu\OneDrive - Alloyed\Documents\Market-Prediction-Research")
+sys.path.append(r"C:\Users\YuweiZhu\OneDrive - Alloyed\Documents\Market-Prediction-Research\terminal")
+from terminal.models.deep_q_agent import DQNAgent
+from terminal.models.feed_forward_network import FeedForward
+from terminal.environments.stock_env import StockEnvironment
 
 
 class TestStockEnv(unittest.TestCase):
@@ -16,7 +16,7 @@ class TestStockEnv(unittest.TestCase):
         self.folder_path = "raw_data/"
         self.file_name = "AAPL"
         self.env = StockEnvironment()
-        self.env.make(self.file_name, folder_path=self.folder_path)
+        self.env.make(self.file_name)
         
     def test_make(self):
         with self.assertRaises(AssertionError):

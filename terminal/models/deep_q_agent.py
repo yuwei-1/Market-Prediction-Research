@@ -6,13 +6,16 @@ import pandas as pd
 import numpy as np
 from collections import namedtuple, deque
 from itertools import count
+import sys
+sys.path.append(r"C:\Users\YuweiZhu\OneDrive - Alloyed\Documents\Market-Prediction-Research")
+sys.path.append(r"C:\Users\YuweiZhu\OneDrive - Alloyed\Documents\Market-Prediction-Research\terminal")
 
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 from models.feed_forward_network import FeedForward
-from terminal.models.reinforcement_learning_agent import Agent
+from models.reinforcement_learning_agent import Agent
 from environments.stock_env import StockEnvironment
 from utils.guards import shape_guard
 
@@ -50,7 +53,8 @@ class DQNAgent(Agent):
         self.target_net_update = self.update_guard(target_net_update)
         self.gradient_clipping = gradient_clipping
         self.gradient_norm_clipping = gradient_norm_clipping
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        #self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device("cpu")
         self.env, self.n_obs, self.n_actions = self.init_env(environment)
         self.replay_memory = self.init_agent_memory()
         self.net = self.init_agent(self.n_obs, self.n_actions, **net_kwargs)

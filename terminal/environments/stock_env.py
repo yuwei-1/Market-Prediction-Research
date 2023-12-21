@@ -9,6 +9,7 @@ import numpy as np
 import random
 import pandas as pd
 from copy import deepcopy
+import sys
 
 class StockEnvironment(ReinforcementLearningEnvironment):
     '''
@@ -34,7 +35,7 @@ class StockEnvironment(ReinforcementLearningEnvironment):
         
         self.action_space = self.Aspace(len(self.actions), self.sample)
         self.observation_space = self.Obspace((self.X_train.shape[1],))
-        print("The following derived features are in use: ", fg.training_features)
+        #print("The following derived features are in use: ", fg.training_features)
 
     def stock_generator(self, dataset):
         if dataset == "train":

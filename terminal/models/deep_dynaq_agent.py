@@ -11,8 +11,8 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 from models.feed_forward_network import FeedForward
-from terminal.models.deep_q_agent import DQNAgent
-from terminal.models.nn_world_model import NNWorldModel
+from models.deep_q_agent import DQNAgent
+from models.nn_world_model import NNWorldModel
 
 from IPython import display
 is_ipython = 'inline' in matplotlib.get_backend()
