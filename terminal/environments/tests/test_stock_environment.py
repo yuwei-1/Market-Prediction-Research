@@ -6,7 +6,7 @@ sys.path.append(r"C:\Users\YuweiZhu\OneDrive - Alloyed\Documents\Market-Predicti
 sys.path.append(r"C:\Users\YuweiZhu\OneDrive - Alloyed\Documents\Market-Prediction-Research\terminal")
 from terminal.models.deep_q_agent import DQNAgent
 from terminal.models.feed_forward_network import FeedForward
-from terminal.environments.stock_env import StockEnvironment
+from terminal.environments.custom_stock_env import StockEnvironment
 
 
 class TestStockEnv(unittest.TestCase):

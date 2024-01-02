@@ -1,4 +1,5 @@
 import gymnasium as gym
+import gym_trading_env
 import random
 import matplotlib
 import matplotlib.pyplot as plt
@@ -16,7 +17,7 @@ import torch.optim as optim
 import torch.nn.functional as F
 from models.feed_forward_network import FeedForward
 from models.reinforcement_learning_agent import Agent
-from environments.stock_env import StockEnvironment
+from terminal.environments.custom_stock_env import StockEnvironment
 from utils.guards import shape_guard
 
 from IPython import display
@@ -33,7 +34,7 @@ class DQNAgent(Agent):
                 eps_start=1.0,
                 eps_end=0.05,
                 eps_decay_length=10000,
-                environment='CartPole-v1', 
+                environment=gym.make('CartPole-v1', render_mode="human"), 
                 gradient_clipping=-1,
                 gradient_norm_clipping=1,
                 activation='relu',
@@ -53,9 +54,8 @@ class DQNAgent(Agent):
         self.target_net_update = self.update_guard(target_net_update)
         self.gradient_clipping = gradient_clipping
         self.gradient_norm_clipping = gradient_norm_clipping
-        #self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.device = torch.device("cpu")
-        self.env, self.n_obs, self.n_actions = self.init_env(environment)
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.n_obs, self.n_actions = self.get_env_info()
         self.replay_memory = self.init_agent_memory()
         self.net = self.init_agent(self.n_obs, self.n_actions, **net_kwargs)
         if self.double_dqn:
@@ -64,15 +64,10 @@ class DQNAgent(Agent):
         self.transition = namedtuple('Transition', ('state', 'action', 'next_state', 'reward'))
         self.stats = "training"
         
-    def init_env(self, environment, render_mode="human"):
-        if environment in {"AAPL"}:
-            env = StockEnvironment()
-            env.make(environment, prediction_period=self.prediction_period)
-        else:
-            env = gym.make(environment, render_mode=render_mode)
-        n_actions = env.action_space.n
-        n_obs = env.observation_space.shape[0]
-        return env, n_obs, n_actions
+    def get_env_info(self):
+        n_actions = self.environment.action_space.n
+        n_obs = self.environment.observation_space.shape[0]
+        return n_obs, n_actions
 
     def init_agent(self, input_size, output_size, q_func_approximator=FeedForward, **net_kwargs):
         return q_func_approximator(input_size, output_size, non_linearity=self.activation, **net_kwargs).to(self.device)
@@ -92,7 +87,7 @@ class DQNAgent(Agent):
         Optimizer should be passed in as a lambda function only accepting the model parameters and learning rate
         '''
         self.episodes = episodes
-        self.title = title if title else self.environment
+        self.title = title if title else ""
         self.discount = discount
         self.batch_size = batch_size
         self.train_threshold = train_threshold
@@ -115,14 +110,14 @@ class DQNAgent(Agent):
         if continuous:
             self.test()
         for ep in range(self.episodes):
-            state, _ = self.env.reset()
+            state, _ = self.environment.reset()
             state = torch.tensor(state, dtype=torch.float32).to(self.device)
             cum_return = 0
             for t in count():
                 # agent chooses an action
                 action = self.get_action(state)
                 # observe new obs from environment
-                next_state, reward, terminated, truncated, _ = self.env.step(action.item())
+                next_state, reward, terminated, truncated, _ = self.environment.step(action.item())
                 cum_return += reward
                 # logic for different scenarios
                 if terminated:
@@ -152,7 +147,7 @@ class DQNAgent(Agent):
             if continuous:
                 self.test()
 
-        self.env.close()
+        self.environment.close()
         if self.plot:
             self.plot_final(title=self.title)
 
@@ -185,25 +180,25 @@ class DQNAgent(Agent):
     def test(self):
         # code for testing stock predictive performance of DQN
         self.net.eval()
-        state, _ = self.env.reset(dataset='test')
+        state, _ = self.environment.reset(dataset='test')
         state = torch.tensor(state, dtype=torch.float32).to(self.device)
         actions = []
         for t in count():
             action = self.get_action(state, explore=False).item()
             actions += [action]
-            next_state, reward, terminated, truncated, _ = self.env.step(action)
+            next_state, reward, terminated, truncated, _ = self.environment.step(action)
             if next_state is not None:
                 next_state = torch.tensor(next_state, dtype=torch.float32).to(self.device)
             if terminated:
                 break
             state = next_state
-        optimal = self.env.y_test[1:]
+        optimal = self.environment.y_test[1:]
         actions = np.array(actions[:-1])
         mask = ~(actions == 2)
         acc = (optimal[mask] == actions[mask]).sum()/optimal[mask].shape[0]
 
         print(f"test score: {acc}")
-        self.stats = f"Training .. current test score = {acc}"
+        self.stats = f"Training .. test score = {acc}"
         return actions, optimal
 
     def save(self, file_path):
@@ -301,7 +296,7 @@ class DQNAgent(Agent):
         rand = random.uniform(0,1)
         if rand <= ep_threshold and explore:
             # choose random action
-            return torch.tensor([self.env.action_space.sample()], device=self.device, dtype=torch.long)
+            return torch.tensor([self.environment.action_space.sample()], device=self.device, dtype=torch.long)
         else:
             # greedy: choose action with largest value
             with torch.no_grad():

@@ -1,5 +1,6 @@
 import unittest
 import sys
+import gymnasium as gym
 sys.path.append(r"C:\Users\YuweiZhu\OneDrive - Alloyed\Documents\Market-Prediction-Research")
 sys.path.append(r"C:\Users\YuweiZhu\OneDrive - Alloyed\Documents\Market-Prediction-Research\terminal")
 import gymnasium
@@ -12,15 +13,15 @@ class BaseDQNTests:
     
     class TestDQN(unittest.TestCase):
 
-        def test_init_env(self):
-            gym_envs = ["CartPole-v1"]
-            for env in gym_envs:
-                out = self.dqn.init_env(env)
-                self.assertEqual(len(out), 3)
-            fake_env = ["League-v1", "Fakegame-v0"]
-            for env in fake_env:
-                with self.assertRaises(gymnasium.error.NameNotFound):
-                    out = self.dqn.init_env(env)
+        # def test_init_env(self):
+        #     gym_envs = ["CartPole-v1"]
+        #     for env in gym_envs:
+        #         out = self.dqn.init_env(env)
+        #         self.assertEqual(len(out), 3)
+        #     fake_env = ["League-v1", "Fakegame-v0"]
+        #     for env in fake_env:
+        #         with self.assertRaises(gymnasium.error.NameNotFound):
+        #             out = self.dqn.init_env(env)
 
         def test_ff_agent(self):
             dummy_size = 5
@@ -58,7 +59,8 @@ class BaseDQNTests:
                 self.assertTrue((target_dict[key] == 1-self.dqn.tau).all())
 
         def test_qagent_training(self):
-            self.dqn.init_env(environment="CartPole-v1", render_mode=None)
+            #self.dqn.init_env(environment="CartPole-v1", render_mode=None)
+            self.dqn = DQNAgent(double_dqn=True, environment=gym.make('CartPole-v1', render_mode="none"))
             eps = 1
             discount = 0.99
             title="testing train method"

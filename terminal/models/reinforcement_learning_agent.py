@@ -23,10 +23,6 @@ class Agent:
         pass
 
     @abstractmethod
-    def init_env(self):
-        pass
-
-    @abstractmethod
     def train(self):
         pass
 
@@ -41,16 +37,3 @@ class Agent:
     @abstractmethod
     def load(self, path):
         pass
-
-    # @abstractmethod
-    # def get_agent_prediction(self):
-    #     pass
-    
-    # def epsilon_greedy(self, t, threshold_func=None):
-    #     if threshold_func is None:
-    #         threshold = 0.05
-    #     else:
-    #         threshold = threshold_func(t)
-        
-    #     rand = random.uniform(0,1)
-    #     if rand <= threshold:

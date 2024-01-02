@@ -1,5 +1,6 @@
 import unittest
 import sys
+import torch
 sys.path.append(r"C:\Users\YuweiZhu\OneDrive - Alloyed\Documents\Market-Prediction-Research")
 sys.path.append(r"C:\Users\YuweiZhu\OneDrive - Alloyed\Documents\Market-Prediction-Research\terminal")
 
@@ -12,6 +13,7 @@ class TestDynaDQN(BaseDQNTests.TestDQN):
 
     def __init__(self, methodName: str = "runTest") -> None:
         super().__init__(methodName)
+        torch.manual_seed(0)
         self.dqn = DynaDQNAgent(double_dqn=True)
         self.batch_size = 2
         self.train_threshold = 10

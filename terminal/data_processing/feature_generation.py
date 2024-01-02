@@ -12,8 +12,9 @@ class FeatureGenerator:
         task = task.lower()
         self.task_guard(task)
         self.df = data
+        self.info = {}
         self.target_variable = target_variable
-        self._remove_unused_columns()
+        #self._remove_unused_columns()
         if task == "classification":
             self._create_classes()
         elif task == "regression":
@@ -69,8 +70,8 @@ class FeatureGenerator:
         self.df[column_name] = 100 - (100/(1 + relative_strength))
 
     def apply_MACD_indicator(self, long_term=26, short_term=12, signal=9):
-        long_ema = self.apply_single_exponential_moving_average(period=long_term)
-        short_ema = self.apply_single_exponential_moving_average(period=short_term)
+        long_ema = self._apply_single_exponential_moving_average(period=long_term)
+        short_ema = self._apply_single_exponential_moving_average(period=short_term)
         self.df[f"{long_term}/{short_term} macd"] = macd = short_ema - long_ema
         self.df[f"{long_term}/{short_term} macd {signal} day signal"] = macd.ewm(span=signal, adjust=False).mean()
         self.training_features += [f"{long_term}/{short_term} macd", f"{long_term}/{short_term} macd {signal} day signal"]
@@ -103,20 +104,25 @@ class FeatureGenerator:
     def apply_exponential_moving_average(self, periods:list or int):        
         periods = list(periods) if isinstance(periods, int) else periods
         for p in periods:
-            self.apply_single_exponential_moving_average(period=p)
+            self._apply_single_exponential_moving_average(period=p)
 
-    def apply_single_exponential_moving_average(self, period:int):
+    def _apply_single_exponential_moving_average(self, period:int):
         column_name = f"{period} day ema"
         self.training_features += [column_name]
-        self.df[column_name] = col = self.df[self.target_variable].ewm(span=period, adjust=False).mean()
+        
+        # calculate initial indicator value as simple moving average
+        left = self.df[self.target_variable].rolling(period).mean()[:period].tolist()
+        right = self.df[self.target_variable][period:].tolist()
+        self.df["_"] = left + right
+        self.df[column_name] = col = self.df["_"].ewm(span=period, adjust=False).mean()
         return col
 
     def apply_momentum(self, periods:list):
         periods = list(periods) if isinstance(periods, int) else periods
         for p in periods:
-            self.apply_single_momentum(period=p)
+            self._apply_single_momentum(period=p)
 
-    def apply_single_momentum(self, period:int):
+    def _apply_single_momentum(self, period:int):
         column_name = f"{period} day momentum"
         self.training_features += [column_name]
         self.df[column_name] = self.df[self.target_variable].pct_change(period)
@@ -142,7 +148,10 @@ class FeatureGenerator:
         y = self.df[target].to_numpy()
 
         scaler = StandardScaler()
-        X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=random_state, test_size=test_split)
+        close_prices = self.df["Close"]
+        X_train, X_test, y_train, y_test, train_close, test_close = train_test_split(X, y, close_prices, shuffle=False, random_state=random_state, test_size=test_split)
+        self.info["test_close_prices"] = test_close
+        self.info["train_close_prices"] = train_close
         X_train = scaler.fit_transform(X_train)
         X_test = scaler.transform(X_test)
 
