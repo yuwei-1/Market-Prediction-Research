@@ -4,8 +4,8 @@ import torch.nn as nn
 
 def non_linearity_guard(activation):
     activation = activation.lower()
-    allowed = {'tanh', 'relu', 'gelu', 'none'}
-    assert activation in allowed, "The non-linearity must be in 'tanh', 'relu', 'gelu', 'none'"
+    allowed = {'tanh', 'relu', 'gelu', 'sigmoid', 'softmax', 'none'}
+    assert activation in allowed, f"The non-linearity must be in {allowed}"
 
     if activation == 'tanh':
         return nn.Tanh()
@@ -13,6 +13,10 @@ def non_linearity_guard(activation):
         return nn.ReLU()
     elif activation == 'gelu':
         return nn.GELU()
+    elif activation == 'sigmoid':
+        return nn.Sigmoid()
+    elif activation == 'softmax':
+        return nn.Softmax()
     elif activation == 'none':
         return nn.Identity()
     

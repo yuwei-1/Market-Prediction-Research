@@ -23,47 +23,23 @@ from utils.guards import shape_guard
 from IPython import display
 is_ipython = 'inline' in matplotlib.get_backend()
 
-class DQNAgent(Agent):
+class RLDojo:
 
     def __init__(self, 
-                double_dqn=False, 
-                target_net_update='hard',
-                tau=0.005,
-                hard_update_interval=500,
-                mem_length=10000,
-                eps_start=1.0,
-                eps_end=0.05,
-                eps_decay_length=10000,
-                environment=gym.make('CartPole-v1', render_mode="human"), 
-                gradient_clipping=-1,
-                gradient_norm_clipping=1,
-                activation='relu',
-                prediction_period=7,
-                **net_kwargs):
-        
-        self.mem_length = mem_length
-        self.double_dqn = double_dqn
-        self.tau = tau
-        self.eps_start = eps_start
-        self.eps_end = eps_end
-        self.eps_decay_length = eps_decay_length
+                agent : Agent,
+                environment=gym.make('CartPole-v1', render_mode="human")):
+    
         self.environment = environment
-        self.prediction_period = prediction_period
-        self.hard_update_interval = hard_update_interval
-        self.activation = activation
-        self.target_net_update = self.update_guard(target_net_update)
-        self.gradient_clipping = gradient_clipping
-        self.gradient_norm_clipping = gradient_norm_clipping
         #self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.device = torch.device("cpu")
         self.n_obs, self.n_actions = self.get_env_info()
         self.replay_memory = self.init_agent_memory()
-        self.net = self.init_agent(self.n_obs, self.n_actions, **net_kwargs)
-        if self.double_dqn:
-            self.target_net = self.init_agent(self.n_obs, self.n_actions, **net_kwargs)
-            self.target_net.load_state_dict(self.net.state_dict())
-        self.transition = namedtuple('Transition', ('state', 'action', 'next_state', 'reward'))
-        self.stats = "training"
+        #self.net = self.init_agent(self.n_obs, self.n_actions, **net_kwargs)
+
+        # if self.double_dqn:
+        #     self.target_net = self.init_agent(self.n_obs, self.n_actions, **net_kwargs)
+        #     self.target_net.load_state_dict(self.net.state_dict())
+        # self.transition = namedtuple('Transition', ('state', 'action', 'next_state', 'reward'))
+        # self.stats = "training"
         
     def get_env_info(self):
         n_actions = self.environment.action_space.n
