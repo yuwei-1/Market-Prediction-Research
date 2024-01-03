@@ -13,7 +13,7 @@ class TestDQN(BaseDQNTests.TestDQN):
     def __init__(self, methodName: str = "runTest") -> None:
         super().__init__(methodName)
         torch.manual_seed(0)
-        self.dqn = DQNAgent(double_dqn=True)
+        self.dqn = DQNAgent(1, 1, double_dqn=True)
         self.batch_size = 1
         self.train_threshold = 1
 

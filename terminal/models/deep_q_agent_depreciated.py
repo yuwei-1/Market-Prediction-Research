@@ -54,7 +54,8 @@ class DQNAgent(Agent):
         self.target_net_update = self.update_guard(target_net_update)
         self.gradient_clipping = gradient_clipping
         self.gradient_norm_clipping = gradient_norm_clipping
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        #self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device("cpu")
         self.n_obs, self.n_actions = self.get_env_info()
         self.replay_memory = self.init_agent_memory()
         self.net = self.init_agent(self.n_obs, self.n_actions, **net_kwargs)
