@@ -19,21 +19,20 @@ is_ipython = 'inline' in matplotlib.get_backend()
 
 class DynaDQNAgent(DQNAgent):
 
-    def __init__(self, n_observations, n_actions, planning_steps=50, world_hidden_size=8, non_linearity='gelu', **dqn_kwargs):
+    def __init__(self, n_observations, n_actions, planning_steps=50, world_hidden_size=8, **dqn_kwargs):
         super().__init__(n_observations, n_actions, **dqn_kwargs)
         self.planning_steps = planning_steps
         self.dyna = False
         self.state_action_mem = set()
-        self.wm = NNWorldModel(n_actions, n_observations, hidden_size=world_hidden_size, non_linearity=non_linearity, device=self.device)
+        self.wm = NNWorldModel(n_actions, n_observations, hidden_size=world_hidden_size, device=self.device)
 
     def step_action_value_function(self, steps_done):
        
         if super().step_action_value_function(steps_done):
             self.construct_world_model()
             self.dyna_planning_steps(steps_done)
-
-        #if self.steps_done % 500 == 0:
-        #    self.stats = self.wm.test(*self.retrieve_all())
+            if steps_done % 500 == 0:
+                self.stats = self.wm.test(*self.retrieve_all())
 
     def construct_world_model(self):
         self.wm.observe(*self.retrieve_batch_info())

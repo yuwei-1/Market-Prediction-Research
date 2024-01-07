@@ -1,4 +1,5 @@
 from models.world_models import WorldModel
+from models.generic_feed_forward_network_creator import GenericFeedForwardNetwork
 import numpy as np
 from collections import OrderedDict
 import torch
@@ -22,17 +23,21 @@ class SimpleNN(nn.Module):
 
 class NNWorldModel(WorldModel):
 
-    def __init__(self, n_actions, state_dim, hidden_size=8, non_linearity='none', device="cpu") -> None:
+    def __init__(self, n_actions, state_dim, hidden_size=8, loss=nn.MSELoss(), device="cpu") -> None:
         super().__init__()
         self.reward_size = 1
         self.terminal_size = 1
         self.device = device
         self.n_actions = n_actions
-        self.state_transition = SimpleNN(n_actions + state_dim, state_dim, hidden_size=hidden_size, non_linearity=non_linearity).to(self.device)
-        self.reward_transition = SimpleNN(n_actions + state_dim, self.reward_size, hidden_size=hidden_size, non_linearity=non_linearity).to(self.device)
-        self.terminal_transition = SimpleNN(n_actions + state_dim, self.terminal_size, hidden_size=hidden_size, non_linearity=non_linearity).to(self.device)
+        #self.state_transition = SimpleNN(n_actions + state_dim, state_dim, hidden_size=hidden_size, non_linearity=non_linearity).to(self.device)
+        #self.reward_transition = SimpleNN(n_actions + state_dim, self.reward_size, hidden_size=hidden_size, non_linearity=non_linearity).to(self.device)
+        #self.terminal_transition = SimpleNN(n_actions + state_dim, self.terminal_size, hidden_size=hidden_size, non_linearity=non_linearity).to(self.device)
 
-        self.loss_fn = nn.MSELoss()
+        self.state_transition = GenericFeedForwardNetwork(3, activations=['gelu', 'none'], nodes_per_layer=[n_actions + state_dim, hidden_size, state_dim])
+        self.reward_transition = GenericFeedForwardNetwork(3, activations=['gelu', 'none'], nodes_per_layer=[n_actions + state_dim, hidden_size, self.reward_size])
+        self.terminal_transition = GenericFeedForwardNetwork(3, activations=['gelu', 'sigmoid'], nodes_per_layer=[n_actions + state_dim, hidden_size, self.terminal_size])
+
+        self.loss_fn = loss
         self.state_opt = torch.optim.Adam(self.state_transition.parameters(), lr=0.001)
         self.reward_opt = torch.optim.Adam(self.reward_transition.parameters(), lr=0.001)
         self.term_opt = torch.optim.Adam(self.terminal_transition.parameters(), lr=0.001)
@@ -105,14 +110,15 @@ class NNWorldModel(WorldModel):
         non_terminal_mask = torch.tensor(tuple(map(lambda ns:ns is not None, next_states)), dtype=torch.bool, device=self.device)
         non_terminal_next_state = torch.stack([x for x in next_states if x is not None], dim=0).to(self.device)
 
-        next_state_pred = self.state_transition(features)[non_terminal_mask]
-        non_terminal_states = F.sigmoid(self.terminal_transition(features)) >= 0.5
-        reward_pred = self.reward_transition(features)
+        next_state_pred = self.state_transition(features)[non_terminal_mask].squeeze()
+        non_terminal_states = F.sigmoid(self.terminal_transition(features).squeeze()) >= 0.5
+        reward_pred = self.reward_transition(features).squeeze()
 
+        shape_guard(next_state_pred, non_terminal_next_state)
+        shape_guard(reward_pred, rewards)
+        shape_guard(non_terminal_states, non_terminal_mask)
         r2_state = self.compute_r2_score(next_state_pred, non_terminal_next_state)
         r2_reward = self.compute_r2_score(reward_pred, rewards)
-
-        shape_guard(non_terminal_states, non_terminal_mask)
         acc = (non_terminal_states == non_terminal_mask).sum()/len(non_terminal_mask)
 
         return f"r2 for state:{r2_state}, r2 for reward:{r2_reward}, accuracy:{acc}"

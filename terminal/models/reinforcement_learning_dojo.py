@@ -110,7 +110,7 @@ class RLDojo:
             plt.title('Result')
         else:
             plt.clf()
-            plt.title("")
+            plt.title(self.agent.stats)
         plt.xlabel('Episode')
         plt.ylabel('Rewards')
         plt.plot(durations_t.numpy())
