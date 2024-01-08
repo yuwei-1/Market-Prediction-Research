@@ -24,6 +24,7 @@ class StockEnvironment(ReinforcementLearningEnvironment):
 
     def __init__(self) -> None:
         super().__init__()
+        self.actions = {"buy":1, "sell":0, "hold":2}
         self.action_history = []
         self.action_mapping = {0:-1, 1:1, 2:0}
     

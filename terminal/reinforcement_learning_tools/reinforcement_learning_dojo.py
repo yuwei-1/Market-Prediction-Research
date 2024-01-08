@@ -15,7 +15,6 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
-from models.feed_forward_network import FeedForward
 from models.reinforcement_learning_agent import Agent
 from terminal.environments.custom_stock_env import StockEnvironment
 from utils.guards import shape_guard
@@ -31,8 +30,7 @@ class RLDojo:
         self.environment = environment
         self.n_obs, self.n_actions = self.get_env_info()
         self.agent = agent(self.n_obs, self.n_actions)
-        #self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.device = torch.device("cpu")
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.transition = namedtuple('Transition', ('state', 'action', 'next_state', 'reward'))
         # self.stats = "training"
         

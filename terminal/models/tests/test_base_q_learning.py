@@ -1,11 +1,10 @@
 import unittest
 import sys
 import gymnasium as gym
+import os
 sys.path.append(r"C:\Users\YuweiZhu\OneDrive - Alloyed\Documents\Market-Prediction-Research")
 sys.path.append(r"C:\Users\YuweiZhu\OneDrive - Alloyed\Documents\Market-Prediction-Research\terminal")
-import gymnasium
 from models.deep_q_agent import DQNAgent
-from models.feed_forward_network import FeedForward
 import torch
 
 
@@ -13,12 +12,25 @@ class BaseDQNTests:
     
     class TestDQN(unittest.TestCase):
 
-        def test_ff_agent(self):
-            dummy_size = 5
-            func = self.dqn.init_agent(dummy_size, dummy_size, FeedForward)
-            self.assertIsInstance(func, FeedForward)
-            self.assertEqual(dummy_size, func.n_observations)
-            self.assertEqual(dummy_size, func.n_actions)
+        def test_double_dqn_init(self):
+            dqn = DQNAgent(1,1)
+            self.assertNotIn('target_net', dqn.__dict__)
+            dqn = DQNAgent(1,1,double_dqn=True)
+            self.assertIn('target_net', dqn.__dict__)
+
+        def test_save_functionality(self):
+            test_file_name = "test.pt"
+            self.dqn.save(test_file_name)
+            self.assertTrue(os.path.exists(test_file_name))
+            if os.path.exists(test_file_name):
+                os.remove(test_file_name)
+        
+        def test_load_functionality(self):
+            self.dqn.load(r"C:\Users\YuweiZhu\OneDrive - Alloyed\Documents\Market-Prediction-Research\terminal\models\tests\test_model.pt")
+            for param in self.dqn.net.parameters():
+                self.assertEqual(param.mean().item(), 0)
+            for param in self.dqn.target_net.parameters():
+                self.assertEqual(param.mean().item(), 0)
 
         def test_hard_update(self):
             dqn_state_dict = self.dqn.net.state_dict()

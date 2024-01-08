@@ -15,7 +15,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
-from models.feed_forward_network import FeedForward
+from models.generic_feed_forward_network_creator import GenericFeedForwardNetwork
 from models.reinforcement_learning_agent import Agent
 from terminal.environments.custom_stock_env import StockEnvironment
 from utils.guards import shape_guard
@@ -28,6 +28,8 @@ class DQNAgent(Agent):
     def __init__(self,
                 n_observations,
                 n_actions,
+                hidden_size=128,
+                layers=4,
                 double_dqn=False, 
                 target_net_update='hard',
                 tau=0.005,
@@ -44,9 +46,13 @@ class DQNAgent(Agent):
                 train_threshold=500,
                 learning_rate=0.0001,
                 optimizer=lambda param, lr: optim.AdamW(param, lr=lr, amsgrad=True), 
-                loss=nn.MSELoss(),
-                **net_kwargs):
+                loss=nn.SmoothL1Loss()):
         
+        self.n_observations = n_observations
+        self.n_actions = n_actions
+        self.layers = layers
+        self.n_layer_guard(layers)
+        self.hidden_size = hidden_size
         self.mem_length = mem_length
         self.double_dqn = double_dqn
         self.tau = tau
@@ -65,16 +71,19 @@ class DQNAgent(Agent):
         self.loss_fn = loss
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.replay_memory = self.init_agent_memory()
-        self.net = self.init_agent(n_observations, n_actions, **net_kwargs)
+        self.net = self.init_agent(n_observations, n_actions)
         self.optimizer = optimizer(self.net.parameters(), learning_rate)
         if self.double_dqn:
-            self.target_net = self.init_agent(n_observations, n_actions, **net_kwargs)
+            self.target_net = self.init_agent(n_observations, n_actions)
             self.target_net.load_state_dict(self.net.state_dict())
         self.transition = namedtuple('Transition', ('state', 'action', 'next_state', 'reward'))
         self.stats = "training"
         
-    def init_agent(self, input_size, output_size, q_func_approximator=FeedForward, **net_kwargs):
-        return q_func_approximator(input_size, output_size, non_linearity=self.activation, **net_kwargs).to(self.device)
+    def init_agent(self, input_size, output_size, q_func_approximator=GenericFeedForwardNetwork):
+        n_hidden_layers = self.layers - 2
+        nodes_per_layer = [input_size] + [self.hidden_size]*n_hidden_layers + [output_size]
+        activations = [self.activation]*n_hidden_layers + ['none']
+        return q_func_approximator(self.layers, activations, nodes_per_layer).to(self.device)
     
     def train(self):
         self.net.train()
@@ -89,15 +98,11 @@ class DQNAgent(Agent):
     def save(self, file_path):
         net_state_dict = self.net.state_dict()
         torch.save(net_state_dict, file_path)
-        if self.double_dqn:
-            target_state_dict = self.target_net.state_dict()
-            torch.save(target_state_dict, file_path)
 
-    def load(self, model_path, target_path=None):
+    def load(self, model_path):
         self.net.load_state_dict(torch.load(model_path))
         if self.double_dqn:
-            assert target_path is None, "There is no target in use"
-            self.target_net.load_state_dict(torch.load(target_path))
+            self.target_net.load_state_dict(torch.load(model_path))
 
     def perform_soft_target_update(self):
         net_state_dict = self.net.state_dict()
@@ -137,12 +142,14 @@ class DQNAgent(Agent):
 
         current_estimate = torch.gather(self.net(states), 1, actions)
         q_estimate = torch.zeros(self.batch_size, device=self.device)
+        shape_guard(non_terminal_mask, q_estimate)
         with torch.no_grad():
             if self.double_dqn:
                 q_estimate[non_terminal_mask] = (self.discount * torch.max(self.target_net(non_terminal_states), dim=1)[0])
             else:
                 q_estimate[non_terminal_mask] = (self.discount * torch.max(self.net(non_terminal_states), dim=1)[0])
 
+        shape_guard(q_estimate.unsqueeze(1), rewards)
         target = q_estimate.unsqueeze(1) + rewards
         shape_guard(current_estimate, target)
         loss = self.loss_fn(current_estimate, target)
@@ -167,8 +174,6 @@ class DQNAgent(Agent):
         return states, actions, next_states, rewards
     
     def get_action(self, state, steps_done, environment, explore=True):
-        # TODO: how to refactor this so can use other behaviour policies?
-
         ep_threshold = self.epsilon_greedy(steps_done)
         rand = random.uniform(0,1)
         if rand <= ep_threshold and explore:
@@ -193,7 +198,11 @@ class DQNAgent(Agent):
     
     def epsilon_greedy(self, it):
         return max(self.eps_start - (self.eps_start - self.eps_end) * (it / self.eps_decay_length), self.eps_end)
-    
+
+    @staticmethod
+    def n_layer_guard(layers):
+        assert layers > 2, "must have at least input and output layer"
+
     @staticmethod
     def update_guard(update_type):
         assert isinstance(update_type, str), "update type must be string"

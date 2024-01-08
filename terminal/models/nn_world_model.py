@@ -33,9 +33,9 @@ class NNWorldModel(WorldModel):
         #self.reward_transition = SimpleNN(n_actions + state_dim, self.reward_size, hidden_size=hidden_size, non_linearity=non_linearity).to(self.device)
         #self.terminal_transition = SimpleNN(n_actions + state_dim, self.terminal_size, hidden_size=hidden_size, non_linearity=non_linearity).to(self.device)
 
-        self.state_transition = GenericFeedForwardNetwork(3, activations=['gelu', 'none'], nodes_per_layer=[n_actions + state_dim, hidden_size, state_dim])
-        self.reward_transition = GenericFeedForwardNetwork(3, activations=['gelu', 'none'], nodes_per_layer=[n_actions + state_dim, hidden_size, self.reward_size])
-        self.terminal_transition = GenericFeedForwardNetwork(3, activations=['gelu', 'sigmoid'], nodes_per_layer=[n_actions + state_dim, hidden_size, self.terminal_size])
+        self.state_transition = GenericFeedForwardNetwork(3, activations=['gelu', 'none'], nodes_per_layer=[n_actions + state_dim, hidden_size, state_dim]).to(self.device)
+        self.reward_transition = GenericFeedForwardNetwork(3, activations=['gelu', 'none'], nodes_per_layer=[n_actions + state_dim, hidden_size, self.reward_size]).to(self.device)
+        self.terminal_transition = GenericFeedForwardNetwork(3, activations=['gelu', 'sigmoid'], nodes_per_layer=[n_actions + state_dim, hidden_size, self.terminal_size]).to(self.device)
 
         self.loss_fn = loss
         self.state_opt = torch.optim.Adam(self.state_transition.parameters(), lr=0.001)
@@ -112,16 +112,17 @@ class NNWorldModel(WorldModel):
 
         next_state_pred = self.state_transition(features)[non_terminal_mask].squeeze()
         non_terminal_states = F.sigmoid(self.terminal_transition(features).squeeze()) >= 0.5
-        reward_pred = self.reward_transition(features).squeeze()
+        reward_pred = self.reward_transition(features).squeeze() >= 0.5
 
         shape_guard(next_state_pred, non_terminal_next_state)
         shape_guard(reward_pred, rewards)
         shape_guard(non_terminal_states, non_terminal_mask)
         r2_state = self.compute_r2_score(next_state_pred, non_terminal_next_state)
-        r2_reward = self.compute_r2_score(reward_pred, rewards)
+        #r2_reward = self.compute_r2_score(reward_pred, rewards)
+        r2_acc = (reward_pred == rewards).sum()/len(rewards)
         acc = (non_terminal_states == non_terminal_mask).sum()/len(non_terminal_mask)
 
-        return f"r2 for state:{r2_state}, r2 for reward:{r2_reward}, accuracy:{acc}"
+        return f"r2 state:{r2_state}, acc reward:{r2_acc}, acc ep. termination:{acc}"
     
     @staticmethod
     def compute_r2_score(predicted, target):

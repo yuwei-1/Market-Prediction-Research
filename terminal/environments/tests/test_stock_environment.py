@@ -5,7 +5,6 @@ import numpy as np
 sys.path.append(r"C:\Users\YuweiZhu\OneDrive - Alloyed\Documents\Market-Prediction-Research")
 sys.path.append(r"C:\Users\YuweiZhu\OneDrive - Alloyed\Documents\Market-Prediction-Research\terminal")
 from terminal.models.deep_q_agent import DQNAgent
-from terminal.models.feed_forward_network import FeedForward
 from terminal.environments.custom_stock_env import StockEnvironment
 
 
