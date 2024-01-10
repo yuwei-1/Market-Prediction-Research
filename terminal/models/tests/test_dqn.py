@@ -18,17 +18,16 @@ class TestDQN(BaseDQNTests.TestDQN):
         self.batch_size = 1
         self.train_threshold = 1
 
-    # def test_agent_training(self):
-    #     test_env = UnittestEnvironment()
-    #     dqn = lambda obs, actions : DQNAgent(obs, 
-    #                                          actions,
-    #                                          double_dqn=True,
-    #                                          hidden_size=3, 
-    #                                          batch_size=2, 
-    #                                          train_threshold=2, 
-    #                                          learning_rate=0.01)
-    #     dojo = RLDojo(dqn, test_env)
-    #     dojo.train(episodes=2)
+    def test_agent_training(self):
+        test_env = UnittestEnvironment()
+        dqn = lambda obs, actions : DQNAgent(obs, 
+                                             actions,
+                                             hidden_size=3, 
+                                             batch_size=2, 
+                                             train_threshold=2, 
+                                             learning_rate=0.01)
+        dojo = RLDojo(dqn, test_env)
+        dojo.train(episodes=2)
 
 if __name__ == "__main__":
     unittest.main()

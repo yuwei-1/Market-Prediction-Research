@@ -122,8 +122,8 @@ class DQNAgent(Agent):
     def step_action_value_function(self, steps_done):
         if self.get_memory_len() < self.train_threshold:
             return False
-        loss = self.get_network_loss()
-        self.backprop_network(loss, self.gradient_clipping > 0 or self.gradient_norm_clipping > 0)
+        self.loss = self.get_network_loss()
+        self.backprop_network(self.gradient_clipping > 0 or self.gradient_norm_clipping > 0)
 
         if self.double_dqn:
             if self.target_net_update == "soft":
@@ -133,12 +133,12 @@ class DQNAgent(Agent):
         return True
     
     def get_network_loss(self):
-        non_terminal_states = torch.tensor([])
+        #non_terminal_states = torch.tensor([])
 
-        while not non_terminal_states.shape[0]:
-            states, actions, next_states, rewards = self.retrieve_batch_info()
-            non_terminal_mask = torch.tensor(tuple(map(lambda ns:ns is not None, next_states)), device=self.device, dtype=torch.bool)
-            non_terminal_states = torch.stack([ns for ns in next_states if ns is not None]).to(self.device)
+        #while not non_terminal_states.shape[0]:
+        states, actions, next_states, rewards = self.retrieve_batch_info()
+        non_terminal_mask = torch.tensor(tuple(map(lambda ns:ns is not None, next_states)), device=self.device, dtype=torch.bool)
+        non_terminal_states = torch.stack([ns for ns in next_states if ns is not None]).to(self.device)
 
         current_estimate = torch.gather(self.net(states), 1, actions)
         q_estimate = torch.zeros(self.batch_size, device=self.device)
@@ -155,9 +155,9 @@ class DQNAgent(Agent):
         loss = self.loss_fn(current_estimate, target)
         return loss
 
-    def backprop_network(self, loss, clip=False):
+    def backprop_network(self, clip=False):
         self.optimizer.zero_grad()
-        loss.backward()
+        self.loss.backward()
         if clip:
             if self.gradient_norm_clipping > 0:
                 torch.nn.utils.clip_grad_norm_(self.net.parameters(), self.gradient_norm_clipping)
