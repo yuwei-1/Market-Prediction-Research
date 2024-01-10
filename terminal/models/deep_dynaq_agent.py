@@ -12,69 +12,73 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 from models.deep_q_agent import DQNAgent
+from models.linear_world_model import LinearWorldModel
 from models.nn_world_model import NNWorldModel
 
 
 class DynaDQNAgent(DQNAgent):
 
-    def __init__(self, n_observations, n_actions, planning_steps=50, world_hidden_size=8, **dqn_kwargs):
+    def __init__(self, n_observations, n_actions, world_model, dyna_train_threshold=1000, tabular=False, planning_steps=50, **dqn_kwargs):
         super().__init__(n_observations, n_actions, **dqn_kwargs)
+        self.tabular = tabular
         self.planning_steps = planning_steps
         self.dyna = False
-        self.state_action_mem = set()
         self.min_state, self.max_state, self.total_state, self.k = None, None, None, 0
-        self.wm = NNWorldModel(n_actions, n_observations, hidden_size=world_hidden_size, device=self.device)
+        self.wm = world_model
+        self.dyna_train_threshold = dyna_train_threshold
 
     def step_action_value_function(self, steps_done):
+        self.stats = steps_done
         if super().step_action_value_function(steps_done):
-            self.construct_world_model()
-            self.dyna_planning_steps(steps_done)
-            if steps_done % 500 == 0:
-                #self.stats = 
-                self.wm.test(*self.retrieve_all())
+            if steps_done >= self.dyna_train_threshold:
+                self.construct_world_model(steps_done)
+                self.dyna_planning_steps(steps_done)
+                #if steps_done % 500 == 0:
+                    #self.stats = 
+                    #self.wm.test(*self.retrieve_all())
 
-    def construct_world_model(self):
-        self.wm.observe(*self.retrieve_batch_info())
+    def construct_world_model(self, steps_done):
+        if isinstance(self.wm, NNWorldModel):
+            self.wm.observe(*self.retrieve_batch_info())
+        elif isinstance(self.wm, LinearWorldModel) and steps_done % self.dyna_train_threshold == 0:
+            print("trained")
+            self.wm.observe(*self.retrieve_all())
 
     def dyna_planning_steps(self, steps_done):
         self.dyna = True
-        # for g in self.optimizer.param_groups:
-        #     g['lr'] *= 0.1
         for s in range(self.planning_steps):
-            loss = self.get_network_loss()
-            self.backprop_network(loss)
+            self.loss = self.get_network_loss()
+            self.backprop_network()
             if self.double_dqn:
                 if self.target_net_update == "soft":
                     self.perform_soft_target_update()
                 elif self.target_net_update == "hard":
                     self.perform_hard_target_update(steps_done)
-        # for g in self.optimizer.param_groups:
-        #     g['lr'] *= 10
         self.dyna = False
 
     def retrieve_batch_info(self):
-        if not self.dyna:
+        if (not self.dyna) or self.tabular:
             return super().retrieve_batch_info()
         else:
-            # states, actions = zip(*random.sample(list(self.state_action_mem), self.batch_size))
-            # state_batches = torch.stack(states, dim=0)
-            # action_batches = torch.stack(actions, dim=0)
-            state_batches, action_batches = self.sample_hypothetical_state_action_gaussian()
-
+            #states, actions = zip(*random.sample(list(self.state_action_mem), self.batch_size))
+            #state_batches = torch.stack(states, dim=0)
+            #action_batches = torch.stack(actions, dim=0)
+            state_batches, action_batches, _, _ = super().retrieve_batch_info()
             next_state_pred, rewards = self.wm.predict(state_batches, action_batches)
-            return state_batches, action_batches, next_state_pred, rewards
+
+
+            return state_batches, action_batches, next_state_pred, rewards.unsqueeze(1)
         
     def retrieve_all(self):
         batch = self.transition(*zip(*self.replay_memory))
         states = torch.stack(batch.state)
-        rewards = torch.stack(batch.reward).squeeze()
+        rewards = torch.stack(batch.reward)
         actions = torch.stack(batch.action)
         next_states = batch.next_state
         return states, actions, next_states, rewards
     
     def retain_experience(self, *args):
         self.replay_memory.append(self.transition(*args))
-        #self.state_action_mem.add((args[:2]))
         state = args[0]
         if state is not None:
             self.maintain_state_bounds(state)
@@ -102,10 +106,7 @@ class DynaDQNAgent(DQNAgent):
         actions = torch.randint(0, self.n_actions, (self.batch_size, 1)).to(self.device)
         return states, actions
     
-    def sample_hypothetical_state_action_gaussian(self, std_adjust=1):
-        lower_bounds = self.min_state.tolist()
-        upper_bounds = self.max_state.tolist()
-        #mean = (self.min_state + self.max_state)/2
+    def sample_hypothetical_state_action_gaussian(self, std_adjust=0.8):
         mean = self.total_state/self.k
         std = std_adjust*(self.max_state - self.min_state)/6
         self.stats = f"mean: {mean}, std : {std}"
