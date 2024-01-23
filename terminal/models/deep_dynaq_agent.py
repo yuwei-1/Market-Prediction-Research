@@ -41,7 +41,6 @@ class DynaDQNAgent(DQNAgent):
         if isinstance(self.wm, NNWorldModel):
             self.wm.observe(*self.retrieve_batch_info())
         elif isinstance(self.wm, LinearWorldModel) and steps_done % self.dyna_train_threshold == 0:
-            print("trained")
             self.wm.observe(*self.retrieve_all())
 
     def dyna_planning_steps(self, steps_done):
@@ -60,14 +59,9 @@ class DynaDQNAgent(DQNAgent):
         if (not self.dyna) or self.tabular:
             return super().retrieve_batch_info()
         else:
-            #states, actions = zip(*random.sample(list(self.state_action_mem), self.batch_size))
-            #state_batches = torch.stack(states, dim=0)
-            #action_batches = torch.stack(actions, dim=0)
             state_batches, action_batches, _, _ = super().retrieve_batch_info()
             next_state_pred, rewards = self.wm.predict(state_batches, action_batches)
-
-
-            return state_batches, action_batches, next_state_pred, rewards.unsqueeze(1)
+            return state_batches, action_batches, next_state_pred, rewards
         
     def retrieve_all(self):
         batch = self.transition(*zip(*self.replay_memory))
@@ -79,9 +73,9 @@ class DynaDQNAgent(DQNAgent):
     
     def retain_experience(self, *args):
         self.replay_memory.append(self.transition(*args))
-        state = args[0]
-        if state is not None:
-            self.maintain_state_bounds(state)
+        #state = args[0]
+        #if state is not None:
+        #    self.maintain_state_bounds(state)
 
     def maintain_state_bounds(self, state):
         if self.min_state is None:

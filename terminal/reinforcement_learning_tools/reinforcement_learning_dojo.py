@@ -28,11 +28,11 @@ class RLDojo:
                 agent : Agent,
                 environment=gym.make('CartPole-v1', render_mode="human")):
         self.environment = environment
+        self.trading = environment.name == 'Stock'
         self.n_obs, self.n_actions = self.get_env_info()
         self.agent = agent(self.n_obs, self.n_actions)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.transition = namedtuple('Transition', ('state', 'action', 'next_state', 'reward'))
-        # self.stats = "training"
         
     def get_env_info(self):
         n_actions = self.environment.action_space.n
@@ -63,6 +63,8 @@ class RLDojo:
     def train_loop(self, continuous=False):
         #if continuous:
         #    self.test()
+        if self.trading:
+            self.market_returns = []
         for ep in range(self.episodes):
             state, _ = self.environment.reset()
             state = torch.tensor(state, dtype=torch.float32).to(self.device)
@@ -71,7 +73,7 @@ class RLDojo:
                 # agent chooses an action
                 action = self.agent.get_action(state, self.steps_done, self.environment)
                 # observe new obs from environment
-                next_state, reward, terminated, truncated, _ = self.environment.step(action.item())
+                next_state, reward, terminated, truncated, info = self.environment.step(action.item())
                 cum_return += reward
                 # logic for different scenarios
                 if terminated:
@@ -87,7 +89,13 @@ class RLDojo:
                 self.agent.step_action_value_function(self.steps_done)
                 # terminate the episode under stopping conditions
                 if continuous or terminated or truncated:
-                    self.episode_durations.append(cum_return)
+                    self.agent.stats = self.environment.name
+                    if not self.trading:
+                        self.episode_durations.append(cum_return)
+                    else:
+                        trading_metrics = self.environment.get_metrics()
+                        self.episode_durations.append(float(trading_metrics["Portfolio Return"][:-1]))
+                        self.market_returns.append(float(trading_metrics["Market Return"][:-1]))
                     if self.plot:
                         self.plot_durations()
                     if terminated or truncated:
@@ -111,13 +119,18 @@ class RLDojo:
             plt.title(self.agent.stats)
         plt.xlabel('Episode')
         plt.ylabel('Rewards')
-        plt.plot(durations_t.numpy())
+        if not self.trading:
+            plt.plot(durations_t.numpy(), label="episodic returns")
+        else:
+            plt.plot(durations_t.numpy(), label="Portfolio returns")
+            plt.plot(self.market_returns, label="Market Returns")
         # Take 100 episode averages and plot them too
         if len(durations_t) >= 100:
             means = durations_t.unfold(0, 100, 1).mean(1).view(-1)
             means = torch.cat((torch.zeros(99), means))
             plt.plot(means.numpy())
 
+        plt.legend(loc="best")
         plt.pause(0.001)  # pause a bit so that plots are updated
         if is_ipython:
             if not show_result:

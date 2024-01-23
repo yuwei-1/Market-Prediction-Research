@@ -32,9 +32,13 @@ class LinearWorldModel(WorldModel):
         non_terminal_features = features[non_terminal_mask, :]
         non_terminal_next_states = self.to_np(torch.stack([x for x in next_states if x is not None], dim=0))    
 
+        
         self.state_transition.fit(non_terminal_features, non_terminal_next_states)
         self.reward_transition.fit(features, self.to_np(rewards))
-        self.terminal_transition.fit(features, non_terminal_mask)
+        try:
+            self.terminal_transition.fit(features, non_terminal_mask)
+        except:
+            pass
 
     def predict(self, states, actions):
 
@@ -42,6 +46,8 @@ class LinearWorldModel(WorldModel):
 
         next_state = self.state_transition.predict(features)
         rewards = torch.tensor(self.reward_transition.predict(features), requires_grad=True, device=self.device).float()
+        if len(rewards.shape) == 1:
+            rewards = rewards.unsqueeze(1)
         non_terminal_next_state = self.terminal_transition.predict(features)
 
         next_state = [torch.tensor(next_state[i], requires_grad=True, device=self.device).float() if non_terminal_next_state[i] \
