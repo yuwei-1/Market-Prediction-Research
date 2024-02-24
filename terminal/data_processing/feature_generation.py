@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import sys
+from typing import *
 sys.path.append(r"C:\Users\YuweiZhu\OneDrive - Alloyed\Documents\Market-Prediction-Research\terminal")
 from data_processing.reader import DataReader
 from sklearn.model_selection import train_test_split
@@ -76,7 +77,7 @@ class FeatureGenerator:
         self.df[f"{long_term}/{short_term} macd {signal} day signal"] = macd.ewm(span=signal, adjust=False).mean()
         self.training_features += [f"{long_term}/{short_term} macd", f"{long_term}/{short_term} macd {signal} day signal"]
 
-    def apply_moving_averages(self, periods:list or int):        
+    def apply_moving_averages(self, periods:List | int):        
         periods = list(periods) if isinstance(periods, int) else periods
         for p in periods:
             self._apply_single_moving_average(period=p)
@@ -101,7 +102,7 @@ class FeatureGenerator:
         self.df[col_names[0]] = ma - 2*std
         self.df[col_names[1]] = ma + 2*std
     
-    def apply_exponential_moving_average(self, periods:list or int):        
+    def apply_exponential_moving_average(self, periods:List | int):        
         periods = list(periods) if isinstance(periods, int) else periods
         for p in periods:
             self._apply_single_exponential_moving_average(period=p)
@@ -127,7 +128,7 @@ class FeatureGenerator:
         self.training_features += [column_name]
         self.df[column_name] = self.df[self.target_variable].pct_change(period)
 
-    def apply_moving_cumulation(self, periods:list or int):
+    def apply_moving_cumulation(self, periods:List | int):
         periods = list(periods) if isinstance(periods, int) else periods
         for p in periods:
             self._apply_single_moving_cumulation(period=p)

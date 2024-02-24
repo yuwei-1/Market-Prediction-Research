@@ -28,7 +28,10 @@ class RLDojo:
                 agent : Agent,
                 environment=gym.make('CartPole-v1', render_mode="human")):
         self.environment = environment
-        self.trading = environment.name == 'Stock'
+        try:
+            self.trading = environment.name == 'Stock'
+        except:
+            self.trading = False
         self.n_obs, self.n_actions = self.get_env_info()
         self.agent = agent(self.n_obs, self.n_actions)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -89,7 +92,7 @@ class RLDojo:
                 self.agent.step_action_value_function(self.steps_done)
                 # terminate the episode under stopping conditions
                 if continuous or terminated or truncated:
-                    self.agent.stats = self.environment.name
+                    #self.agent.stats = self.environment.name
                     if not self.trading:
                         self.episode_durations.append(cum_return)
                     else:

@@ -13,7 +13,6 @@ import torch.optim as optim
 import torch.nn.functional as F
 from models.deep_q_agent import DQNAgent
 from models.linear_world_model import LinearWorldModel
-from models.linear_world_model import LinearWorldModel
 from models.nn_world_model import NNWorldModel
 
 
@@ -68,13 +67,9 @@ class DynaDQNAgent(DQNAgent):
         batch = self.transition(*zip(*self.replay_memory))
         states = torch.stack(batch.state)
         rewards = torch.stack(batch.reward)
-        rewards = torch.stack(batch.reward)
         actions = torch.stack(batch.action)
         next_states = batch.next_state
         return states, actions, next_states, rewards
-    
-    def retain_experience(self, *args):
-        self.replay_memory.append(self.transition(*args))
 
     def maintain_state_bounds(self, state):
         if self.min_state is None:
