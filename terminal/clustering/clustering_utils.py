@@ -14,11 +14,18 @@ def create_nearest_neighbour_adjacency_matrix(X, k=3, include_self=False, **kwar
         adj_matrix[i][ind[i]] = 1
     return adj_matrix
 
-def create_exponential_adjacency_matrix(X, sigma=0.01, **kwargs):
+def create_exponential_adjacency_matrix(X, gamma=1, **kwargs):
     n = X.shape[0]
-    tree = KDTree(X)
-    dist, _ = tree.query(X, k=n)
+    # tree = KDTree(X)
+    # dist, _ = tree.query(X, k=n)
+    # adj_matrix = np.zeros((n,n))
+    # for i in range(n):
+    #     adj_matrix[i] = np.exp(-gamma*(dist[i]**2))
+    # return adj_matrix
     adj_matrix = np.zeros((n,n))
     for i in range(n):
-        adj_matrix[i] = np.exp(-(dist[i]**2)/(2*sigma**2))
+        current_point = X[i]
+        distance_to_point = (X - current_point)**2
+        distances = np.exp(-gamma*np.sum(distance_to_point, axis=-1).T)
+        adj_matrix[i] = distances
     return adj_matrix

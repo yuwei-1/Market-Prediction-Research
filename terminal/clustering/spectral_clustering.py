@@ -5,8 +5,9 @@ from sklearn.cluster import KMeans
 
 class SpectralClustering:
 
-    def __init__(self, clusters=2, k=3, affinity="nearest_neighbors") -> None:
+    def __init__(self, clusters=2, k=3, gamma=1, affinity="nearest_neighbors") -> None:
         self._k = k
+        self._gamma = gamma
         self._clusters = clusters
         self._affinity = self._affinity_guard(affinity)
 
@@ -18,7 +19,7 @@ class SpectralClustering:
         return L
     
     def fit(self, X):
-        adj = self._affinity(X, k=self._k)
+        adj = self._affinity(X, k=self._k, gamma=self._gamma)
         L = self._create_graph_laplacian(adj)
         w, v = np.linalg.eigh(L)
         idcs = np.argsort(w)
