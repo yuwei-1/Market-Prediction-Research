@@ -2,6 +2,8 @@ from sklearn.neighbors import KDTree
 import numpy as np
 
 
+## TODO: write tests for these
+
 def create_nearest_neighbour_adjacency_matrix(X, k=3, include_self=False, **kwargs):
     n = X.shape[0]
     tree = KDTree(X)
@@ -16,12 +18,6 @@ def create_nearest_neighbour_adjacency_matrix(X, k=3, include_self=False, **kwar
 
 def create_exponential_adjacency_matrix(X, gamma=1, **kwargs):
     n = X.shape[0]
-    # tree = KDTree(X)
-    # dist, _ = tree.query(X, k=n)
-    # adj_matrix = np.zeros((n,n))
-    # for i in range(n):
-    #     adj_matrix[i] = np.exp(-gamma*(dist[i]**2))
-    # return adj_matrix
     adj_matrix = np.zeros((n,n))
     for i in range(n):
         current_point = X[i]
